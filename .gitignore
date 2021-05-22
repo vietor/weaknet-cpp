@@ -1,0 +1,12 @@
+.aproject/
+GPATH
+GTAGS
+GRTAGS
+
+build/
+aimoscreen*
+Makefile
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
