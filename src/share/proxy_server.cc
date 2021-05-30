@@ -1,4 +1,4 @@
-#include "ProxyServer.h"
+#include "proxy_server.h"
 
 ProxyServer::ProxyServer(event_base *base, unsigned short port) : base_(base), port_(port) {}
 

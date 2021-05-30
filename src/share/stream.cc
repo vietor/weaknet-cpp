@@ -1,0 +1,173 @@
+#include "stream.h"
+
+#include <event2/buffer.h>
+#include <openssl/md5.h>
+#include <sodium.h>
+#include <sodium/utils.h>
+
+enum StreamCipherMode { CHACHA20 = 0, CHACHA20_IETF };
+
+struct StreamCipherInfo {
+  const char *name;
+  unsigned int cipher;
+  unsigned int key_size;
+  unsigned int iv_size;
+};
+
+StreamCipherInfo supported_ciphers[] = {{"chacha20", CHACHA20, crypto_stream_chacha20_KEYBYTES, crypto_stream_chacha20_NONCEBYTES},
+                                        {"chacha20-ietf", CHACHA20_IETF, crypto_stream_chacha20_ietf_KEYBYTES, crypto_stream_chacha20_ietf_NONCEBYTES}};
+
+static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
+{
+  MD5_CTX md;
+  unsigned int i, j, addmd, total_size;
+  size_t password_len = strlen(password);
+  unsigned char md_buf[MD5_DIGEST_LENGTH];
+
+  memset(out, 0, sizeof(*out));
+  out->key_size = key_size;
+  out->iv_size = iv_size;
+  total_size = key_size + iv_size;
+  for (j = 0, addmd = 0; j < total_size; addmd++) {
+    MD5_Init(&md);
+    if (addmd) {
+      MD5_Update(&md, md_buf, MD5_DIGEST_LENGTH);
+    }
+    MD5_Update(&md, password, password_len);
+    MD5_Final(md_buf, &md);
+
+    for (i = 0; i < MD5_DIGEST_LENGTH; i++, j++) {
+      if (j >= total_size) break;
+      if (j < key_size) {
+        out->key[j] = md_buf[i];
+      } else {
+        out->iv[j - key_size] = md_buf[i];
+      }
+    }
+  }
+}
+
+std::vector<unsigned char> StreamCrypto::help_buffer_;
+
+StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher), cipher_key_(cipher_key) {}
+
+StreamCrypto::~StreamCrypto() {}
+
+void StreamCrypto::Release() { delete this; }
+
+evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
+{
+  size_t counter = en_bytes_ / 64;
+  size_t padding = en_bytes_ % 64;
+  size_t data_len = evbuffer_get_length(buf);
+  size_t code_pos = 0, drain_len = padding;
+
+  if (!en_iv_) {
+    if (padding > cipher_key_->iv_size) {
+      drain_len = padding - cipher_key_->iv_size;
+    } else {
+      drain_len = 0;
+      code_pos = cipher_key_->iv_size - padding;
+    }
+  }
+
+  size_t code_len = padding + data_len;
+  unsigned char *code = evbuffer_pullup(buf, data_len);
+  if (padding) {
+    if (code_len > help_buffer_.size()) {
+      help_buffer_.resize(code_len * 1.5);
+    }
+    unsigned char *tmp = &help_buffer_[0];
+    memset(tmp, 0, padding);
+    memcpy(tmp + padding, code, data_len);
+    code = tmp;
+  }
+
+  struct evbuffer_iovec v;
+  evbuffer *target = evbuffer_new();
+  evbuffer_reserve_space(target, code_pos + code_len, &v, 1);
+  if (cipher_ == CHACHA20) {
+    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+  } else {
+    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+  }
+  if (!en_iv_) {
+    en_iv_ = true;
+    memcpy((unsigned char *)v.iov_base + drain_len, cipher_key_->iv, cipher_key_->iv_size);
+  }
+  en_bytes_ += data_len;
+  v.iov_len = code_pos + code_len;
+  evbuffer_commit_space(target, &v, 1);
+  if (drain_len > 0) {
+    evbuffer_drain(target, drain_len);
+  }
+  return target;
+}
+
+evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
+{
+  size_t counter = de_bytes_ / 64;
+  size_t padding = de_bytes_ % 64;
+  size_t data_len = evbuffer_get_length(buf);
+
+  if (!de_iv_) {
+    if (data_len < cipher_key_->iv_size) {
+      // broken, maybe never happen
+      return nullptr;
+    }
+    de_iv_ = true;
+    data_len -= cipher_key_->iv_size;
+    evbuffer_drain(buf, cipher_key_->iv_size);
+  }
+
+  size_t code_len = padding + data_len;
+  unsigned char *code = evbuffer_pullup(buf, data_len);
+  if (padding) {
+    if (code_len > help_buffer_.size()) {
+      help_buffer_.resize(code_len * 1.5);
+    }
+    unsigned char *tmp = &help_buffer_[0];
+    memset(tmp, 0, padding);
+    memcpy(tmp + padding, code, data_len);
+    code = tmp;
+  }
+
+  struct evbuffer_iovec v;
+  evbuffer *target = evbuffer_new();
+  evbuffer_reserve_space(target, code_len, &v, 1);
+  if (cipher_ == CHACHA20) {
+    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+  } else {
+    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+  }
+  de_bytes_ += data_len;
+  v.iov_len = code_len;
+  evbuffer_commit_space(target, &v, 1);
+  if (padding > 0) {
+    evbuffer_drain(target, padding);
+  }
+  return target;
+}
+
+StreamCipher::StreamCipher() {}
+
+StreamCipher::~StreamCipher() {}
+
+StreamCrypto *StreamCipher::NewCrypto() { return new StreamCrypto(cipher_, &cipher_key_); };
+
+StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *password)
+{
+  StreamCipherInfo *info = nullptr;
+  for (size_t i = 0; i < sizeof(supported_ciphers) / sizeof(supported_ciphers[0]); ++i) {
+    if (strcmp(algorithm, supported_ciphers[i].name) == 0) {
+      info = &supported_ciphers[i];
+    }
+  }
+
+  if (!info) return nullptr;
+
+  StreamCipher *out = new StreamCipher();
+  out->cipher_ = info->cipher;
+  DeriveCipherKey(&out->cipher_key_, password, info->key_size, info->iv_size);
+  return out;
+}

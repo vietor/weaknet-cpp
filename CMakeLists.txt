@@ -18,6 +18,12 @@ if(Libevent_FOUND)
   list(APPEND EXTERNAL_LIBRARIES "${LIBEVENT_LIBRARIES}")
 endif()
 
+find_package(OpenSSL REQUIRED)
+if(OpenSSL_FOUND)
+  include_directories("${OPENSSL_INCLUDE_DIR}")
+  list(APPEND EXTERNAL_LIBRARIES "${OPENSSL_LIBRARIES}")
+endif()
+
 find_package(Sodium REQUIRED)
 if(Sodium_FOUND)
   include_directories("${sodium_INCLUDE_DIR}")
@@ -26,5 +32,5 @@ endif()
 
 aux_source_directory(src/share SHARE_SOURCES)
 
-add_executable(weaknet-server src/cmds/weaknet-server.cpp ${SHARE_SOURCES})
+add_executable(weaknet-server src/cmds/server.cc ${SHARE_SOURCES})
 target_link_libraries(weaknet-server ${EXTERNAL_LIBRARIES})

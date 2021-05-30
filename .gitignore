@@ -4,6 +4,7 @@ GTAGS
 GRTAGS
 
 build/
+build.sh
 aimoscreen*
 Makefile
 CMakeLists.txt.user

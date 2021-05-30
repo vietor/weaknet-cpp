@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../share/ProxyServer.h"
 #include "../share/network.h"
+#include "../share/proxy_server.h"
 
 void quit(const char *message)
 {
@@ -24,7 +24,9 @@ void usage(const char *app)
 
   fprintf(stderr,
           "Usage: %s <options>\n"
-          " -p or --port <port>, range 1-65535",
+          " -P or --port <port>, range 1-65535\n"
+          " -a or --algorithm <algorithm>\n"
+          " -p or --password <password>",
           name);
   exit(EXIT_FAILURE);
 }
@@ -43,13 +45,26 @@ int main(int argc, char *argv[])
 
   int opt;
   const char *short_options = "p:h";
-  struct option long_options[] = {{"port", required_argument, NULL, 'p'}, {"help", no_argument, NULL, 'h'}, {0, 0, 0, 0}};
+  struct option long_options[] = {{"port", required_argument, NULL, 'P'},
+                                  {"algorithm", required_argument, NULL, 'a'},
+                                  {"password", required_argument, NULL, 'p'},
+                                  {"help", no_argument, NULL, 'h'},
+                                  {0, 0, 0, 0}};
 
   int port = 58081;
+  std::string algorithm("chacha20"), password("w*akn*ts*cr*t");
   while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
     switch (opt) {
-      case 'p':
+      case 'P':
         port = atoi(optarg);
+        break;
+
+      case 'a':
+        algorithm = optarg;
+        break;
+
+      case 'p':
+        password = optarg;
         break;
 
       default:
@@ -59,7 +74,15 @@ int main(int argc, char *argv[])
   }
 
   if (port < 1 || port > 65535) {
-    quit("invali option: -p or --port <port>, range 1-65535\n");
+    quit("invali option: port\n");
+  }
+
+  if (algorithm.empty()) {
+    quit("invali option: algorithm\n");
+  }
+
+  if (password.empty()) {
+    quit("invali option: password\n");
   }
 
   if (sodium_init()) {
@@ -78,7 +101,7 @@ int main(int argc, char *argv[])
     quit(error.c_str());
   }
 
-  event_base_dispatch(base);
+  // event_base_dispatch(base);
 
   return 0;
 }

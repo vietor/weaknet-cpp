@@ -1,4 +1,6 @@
-#include "ProxyLocalClient.h"
+#pragma once
+
+#include "proxy_local_client.h"
 
 class ProxyServer
 {

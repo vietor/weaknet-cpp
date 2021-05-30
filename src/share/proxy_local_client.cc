@@ -1,4 +1,4 @@
-#include "ProxyLocalClient.h"
+#include "proxy_local_client.h"
 
 ProxyLocalClient::ProxyLocalClient(bufferevent *client) : client_(client) {}
 
