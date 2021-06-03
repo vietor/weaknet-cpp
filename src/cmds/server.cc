@@ -1,11 +1,10 @@
 #include <getopt.h>
-#include <sodium.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "../share/network.h"
-#include "../share/proxy_server.h"
+#include "../share/remote.h"
+#include "../share/stream.h"
 
 void quit(const char *message)
 {
@@ -52,7 +51,7 @@ int main(int argc, char *argv[])
                                   {0, 0, 0, 0}};
 
   int port = 58081;
-  std::string algorithm("chacha20"), password("w*akn*ts*cr*t");
+  std::string algorithm("chacha20-ietf"), password("w*akn*ts*cr*t");
   while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
     switch (opt) {
       case 'P':
@@ -89,19 +88,26 @@ int main(int argc, char *argv[])
     quit("sodium_init error");
   }
 
+  StreamCipher *cipher = StreamCipher::NewInstance(algorithm.c_str(), password.c_str());
+
   event_base *base = event_base_new();
   if (!base) {
     quit("event_base_new error");
   }
 
+  evdns_base *dnsbase = evdns_base_new(base, 1);
+  if (!dnsbase) {
+    quit("evdns_base_new error");
+  }
+
   std::string error;
 
-  ProxyServer *server = new ProxyServer(base, port);
-  if (!server->Active(error)) {
+  RemoteServer *server = new RemoteServer(base, dnsbase, cipher, port);
+  if (!server->Startup(error)) {
     quit(error.c_str());
   }
 
-  // event_base_dispatch(base);
+  event_base_dispatch(base);
 
   return 0;
 }

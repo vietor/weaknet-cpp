@@ -1,8 +1,6 @@
 #include "stream.h"
 
-#include <event2/buffer.h>
 #include <openssl/md5.h>
-#include <sodium.h>
 #include <sodium/utils.h>
 
 enum StreamCipherMode { CHACHA20 = 0, CHACHA20_IETF };

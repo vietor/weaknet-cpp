@@ -1,5 +1,7 @@
 #pragma once
 
+#include <sodium.h>
+
 #include <vector>
 
 #include "network.h"
