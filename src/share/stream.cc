@@ -2,6 +2,7 @@
 
 #include <openssl/md5.h>
 #include <sodium/utils.h>
+#include <string.h>
 
 enum StreamCipherMode { CHACHA20 = 0, CHACHA20_IETF };
 
@@ -43,11 +44,20 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
       }
     }
   }
+
+  randombytes_buf(out->iv, iv_size);
 }
 
 std::vector<unsigned char> StreamCrypto::help_buffer_;
 
-StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher), cipher_key_(cipher_key) {}
+StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
+{
+  memset(&cipher_node_key_, 0, sizeof(CipherNodeKey));
+  cipher_node_key_.key_size = cipher_key->key_size;
+  cipher_node_key_.iv_size = cipher_key->iv_size;
+  memcpy(cipher_node_key_.key, cipher_key->key, CIPHER_MAX_KEY_SIZE);
+  memcpy(cipher_node_key_.encode_iv, cipher_key->iv, CIPHER_MAX_IV_SIZE);
+}
 
 StreamCrypto::~StreamCrypto() {}
 
@@ -61,11 +71,11 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
   size_t code_pos = 0, drain_len = padding;
 
   if (!en_iv_) {
-    if (padding > cipher_key_->iv_size) {
-      drain_len = padding - cipher_key_->iv_size;
+    if (padding > cipher_node_key_.iv_size) {
+      drain_len = padding - cipher_node_key_.iv_size;
     } else {
       drain_len = 0;
-      code_pos = cipher_key_->iv_size - padding;
+      code_pos = cipher_node_key_.iv_size - padding;
     }
   }
 
@@ -85,13 +95,13 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
   evbuffer *target = evbuffer_new();
   evbuffer_reserve_space(target, code_pos + code_len, &v, 1);
   if (cipher_ == CHACHA20) {
-    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_node_key_.encode_iv, counter, cipher_node_key_.key);
   } else {
-    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_node_key_.encode_iv, counter, cipher_node_key_.key);
   }
   if (!en_iv_) {
     en_iv_ = true;
-    memcpy((unsigned char *)v.iov_base + drain_len, cipher_key_->iv, cipher_key_->iv_size);
+    memcpy((unsigned char *)v.iov_base + drain_len, cipher_node_key_.encode_iv, cipher_node_key_.iv_size);
   }
   en_bytes_ += data_len;
   v.iov_len = code_pos + code_len;
@@ -108,18 +118,19 @@ evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
   size_t padding = de_bytes_ % 64;
   size_t data_len = evbuffer_get_length(buf);
 
+  unsigned char *code = evbuffer_pullup(buf, data_len);
   if (!de_iv_) {
-    if (data_len < cipher_key_->iv_size) {
+    if (data_len < cipher_node_key_.iv_size) {
       // broken, maybe never happen
       return nullptr;
     }
     de_iv_ = true;
-    data_len -= cipher_key_->iv_size;
-    evbuffer_drain(buf, cipher_key_->iv_size);
+    memcpy(cipher_node_key_.decode_iv, code, cipher_node_key_.iv_size);
+    code += cipher_node_key_.iv_size;
+    data_len -= cipher_node_key_.iv_size;
   }
 
   size_t code_len = padding + data_len;
-  unsigned char *code = evbuffer_pullup(buf, data_len);
   if (padding) {
     if (code_len > help_buffer_.size()) {
       help_buffer_.resize(code_len * 1.5);
@@ -134,9 +145,9 @@ evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
   evbuffer *target = evbuffer_new();
   evbuffer_reserve_space(target, code_len, &v, 1);
   if (cipher_ == CHACHA20) {
-    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
   } else {
-    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_key_->iv, counter, cipher_key_->key);
+    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
   }
   de_bytes_ += data_len;
   v.iov_len = code_len;

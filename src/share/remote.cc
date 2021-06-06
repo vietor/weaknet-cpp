@@ -1,7 +1,5 @@
 #include "remote.h"
 
-#include <event2/bufferevent.h>
-
 RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, StreamCipher *cipher, unsigned short port)
     : base_(base), dnsbase_(dnsbase), cipher_(cipher), port_(port)
 {
@@ -60,7 +58,7 @@ RemoteClient::~RemoteClient()
 void RemoteClient::Startup()
 {
   bufferevent_setcb(client_, OnClientRead, NULL, OnClientEvent, this);
-  bufferevent_enable(client_, EV_READ);
+  bufferevent_enable(client_, EV_READ | EV_WRITE);
 }
 
 void RemoteClient::Cleanup() { delete this; }
@@ -163,7 +161,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     }
 
     step_ = STEP_CONNECT;
-    bufferevent_setcb(target_, OnTargetRead, NULL, OnTargetEvent, base_);
+    bufferevent_setcb(target_, OnTargetRead, NULL, OnTargetEvent, this);
     bufferevent_enable(target_, EV_READ | EV_WRITE);
     if (type == 3) {
       bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
@@ -189,7 +187,6 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
       pedding_ = decoded;
       decoded_clear.release();
     }
-
   } else if (step_ == STEP_CONNECT) {
     if (!pedding_) {
       pedding_ = decoded;

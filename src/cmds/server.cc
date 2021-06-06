@@ -23,9 +23,9 @@ void usage(const char *app)
 
   fprintf(stderr,
           "Usage: %s <options>\n"
-          " -P or --port <port>, range 1-65535\n"
-          " -a or --algorithm <algorithm>\n"
-          " -p or --password <password>",
+          " -p or --port <port>, range 1-65535\n"
+          " -m or --algorithm <algorithm>\n"
+          " -s or --password <password>",
           name);
   exit(EXIT_FAILURE);
 }
@@ -41,10 +41,10 @@ int main(int argc, char *argv[])
 #endif
 
   int opt;
-  const char *short_options = "p:a:P:h";
-  struct option long_options[] = {{"port", required_argument, NULL, 'P'},
-                                  {"algorithm", required_argument, NULL, 'a'},
-                                  {"password", required_argument, NULL, 'p'},
+  const char *short_options = "p:m:s:h";
+  struct option long_options[] = {{"port", required_argument, NULL, 'p'},
+                                  {"algorithm", required_argument, NULL, 'm'},
+                                  {"password", required_argument, NULL, 's'},
                                   {"help", no_argument, NULL, 'h'},
                                   {0, 0, 0, 0}};
 
@@ -56,11 +56,11 @@ int main(int argc, char *argv[])
         port = atoi(optarg);
         break;
 
-      case 'a':
+      case 'm':
         algorithm = optarg;
         break;
 
-      case 'p':
+      case 's':
         password = optarg;
         break;
 

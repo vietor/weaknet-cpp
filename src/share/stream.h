@@ -10,10 +10,18 @@
 #define CIPHER_MAX_KEY_SIZE 32
 
 struct CipherKey {
-  unsigned int iv_size;
   unsigned int key_size;
-  unsigned char iv[CIPHER_MAX_IV_SIZE];
+  unsigned int iv_size;
   unsigned char key[CIPHER_MAX_KEY_SIZE];
+  unsigned char iv[CIPHER_MAX_IV_SIZE];
+};
+
+struct CipherNodeKey {
+  unsigned int key_size;
+  unsigned int iv_size;
+  unsigned char key[CIPHER_MAX_KEY_SIZE];
+  unsigned char encode_iv[CIPHER_MAX_IV_SIZE];
+  unsigned char decode_iv[CIPHER_MAX_IV_SIZE];
 };
 
 class StreamCrypto
@@ -35,7 +43,7 @@ class StreamCrypto
   bool de_iv_ = false;
   size_t de_bytes_ = 0;
   unsigned int cipher_ = 0;
-  CipherKey *cipher_key_ = nullptr;
+  CipherNodeKey cipher_node_key_;
   static std::vector<unsigned char> help_buffer_;
 };
 
