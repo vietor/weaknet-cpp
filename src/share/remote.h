@@ -35,13 +35,17 @@ class RemoteClient
   void Cleanup();
 
   static void OnClientRead(bufferevent *bev, void *ctx);
+  static void OnClientWrite(bufferevent *bev, void *ctx);
   static void OnClientEvent(bufferevent *bev, short what, void *ctx);
   static void OnTargetRead(bufferevent *bev, void *ctx);
+  static void OnTargetWrite(bufferevent *bev, void *ctx);
   static void OnTargetEvent(bufferevent *bev, short what, void *ctx);
 
   void HandleClientRead(evbuffer *buf);
+  void HandleClientEmpty();
   void HandleTargetReady();
   void HandleTargetRead(evbuffer *buf);
+  void HandleTargetEmpty();
 
   event_base *base_;
   evdns_base *dnsbase_;

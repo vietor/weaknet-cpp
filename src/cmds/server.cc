@@ -48,11 +48,11 @@ int main(int argc, char *argv[])
                                   {"help", no_argument, NULL, 'h'},
                                   {0, 0, 0, 0}};
 
-  int port = 58081;
+  int port = 51080;
   std::string algorithm("chacha20-ietf"), password("w*akn*ts*cr*t");
   while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
     switch (opt) {
-      case 'P':
+      case 'p':
         port = atoi(optarg);
         break;
 

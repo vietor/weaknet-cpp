@@ -1,5 +1,7 @@
 #include "remote.h"
 
+#define MAX_OUTPUT (512 * 1024)
+
 RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, StreamCipher *cipher, unsigned short port)
     : base_(base), dnsbase_(dnsbase), cipher_(cipher), port_(port)
 {
@@ -76,6 +78,8 @@ void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
   }
 }
 
+void RemoteClient::OnClientWrite(bufferevent *bev, void *ctx) { ((RemoteClient *)ctx)->HandleClientEmpty(); }
+
 void RemoteClient::OnClientEvent(bufferevent *bev, short what, void *ctx)
 {
   RemoteClient *self = (RemoteClient *)ctx;
@@ -96,6 +100,8 @@ void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx)
     self->Cleanup();
   }
 }
+
+void RemoteClient::OnTargetWrite(bufferevent *bev, void *ctx) { ((RemoteClient *)ctx)->HandleTargetEmpty(); }
 
 void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx)
 {
@@ -196,6 +202,17 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     }
   } else {
     bufferevent_write_buffer(target_, decoded);
+
+    if (evbuffer_get_length(bufferevent_get_output(target_)) > MAX_OUTPUT) {
+      bufferevent_disable(client_, EV_READ);
+    }
+  }
+}
+
+void RemoteClient::HandleClientEmpty()
+{
+  if (step_ == STEP_TRANSPORT) {
+    bufferevent_enable(target_, EV_READ);
   }
 }
 
@@ -220,4 +237,15 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
 
   bufferevent_write_buffer(client_, encoded);
   evbuffer_free(encoded);
+
+  if (evbuffer_get_length(bufferevent_get_output(client_)) > MAX_OUTPUT) {
+    bufferevent_disable(target_, EV_READ);
+  }
+}
+
+void RemoteClient::HandleTargetEmpty()
+{
+  if (step_ == STEP_TRANSPORT) {
+    bufferevent_enable(client_, EV_READ);
+  }
 }
