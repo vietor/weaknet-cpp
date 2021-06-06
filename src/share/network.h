@@ -15,9 +15,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#define INVALID_SOCKET -1
-#define closesocket close
-
 #endif
 
 #include <event2/buffer.h>

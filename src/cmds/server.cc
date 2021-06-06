@@ -35,15 +35,13 @@ int main(int argc, char *argv[])
 #ifdef SYS_WINDOWS
   WORD wVersionRequested = MAKEWORD(2, 2);
   WSADATA wsaData;
-  if (WSAStartup(wVersionRequested, &wsaData) != 0) {
-    quit("WSAStartup failed.\n");
-  }
+  WSAStartup(wVersionRequested, &wsaData);
 #else
   signal(SIGPIPE, SIG_IGN);
 #endif
 
   int opt;
-  const char *short_options = "p:h";
+  const char *short_options = "p:a:P:h";
   struct option long_options[] = {{"port", required_argument, NULL, 'P'},
                                   {"algorithm", required_argument, NULL, 'a'},
                                   {"password", required_argument, NULL, 'p'},

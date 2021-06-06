@@ -171,15 +171,15 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
       sockaddr_storage sa;
       memset(&sa, 0, sizeof(sa));
       if (type == 1) {
-        sockaddr_in *in = (sockaddr_in *)&sa;
-        in->sin_family = AF_INET;
-        memcpy(&in->sin_addr.s_addr, data + addr_pos, addr_len);
-        in->sin_port = htons(port);
+        sockaddr_in *sin = (sockaddr_in *)&sa;
+        sin->sin_family = AF_INET;
+        memcpy(&sin->sin_addr.s_addr, data + addr_pos, addr_len);
+        sin->sin_port = htons(port);
       } else {
-        sockaddr_in6 *in6 = (sockaddr_in6 *)&sa;
-        in6->sin6_family = AF_INET6;
-        memcpy(in6->sin6_addr.s6_bytes, data + addr_pos, addr_len);
-        in6->sin6_port = htons(port);
+        sockaddr_in6 *sin6 = (sockaddr_in6 *)&sa;
+        sin6->sin6_family = AF_INET6;
+        memcpy(sin6->sin6_addr.s6_bytes, data + addr_pos, addr_len);
+        sin6->sin6_port = htons(port);
       }
       bufferevent_socket_connect(target_, (sockaddr *)&sa, sizeof(sa));
     }
