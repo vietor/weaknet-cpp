@@ -26,7 +26,7 @@ class RemoteClient
   enum RunStep { STEP_INIT = 0, STEP_CONNECT, STEP_TRANSPORT, STEP_TERMINATE };
 
  public:
-  RemoteClient(event_base *base, evdns_base *dnsbase, bufferevent *client, StreamCrypto *crypto);
+  RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client);
 
   void Startup();
 
@@ -49,9 +49,11 @@ class RemoteClient
 
   event_base *base_;
   evdns_base *dnsbase_;
-  bufferevent *client_;
   StreamCrypto *crypto_;
+  bufferevent *client_;
   RunStep step_ = STEP_INIT;
   evbuffer *pedding_ = nullptr;
   bufferevent *target_ = nullptr;
+  bool client_busy_ = false;
+  bool target_busy_ = false;
 };

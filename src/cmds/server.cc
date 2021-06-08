@@ -1,14 +1,13 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "../share/remote.h"
 #include "../share/stream.h"
 
 void quit(const char *message)
 {
-  fprintf(stderr, message);
+  fputs(message, stderr);
   exit(EXIT_FAILURE);
 }
 

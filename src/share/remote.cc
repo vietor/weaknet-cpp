@@ -37,12 +37,12 @@ void RemoteServer::HandleConnected(evutil_socket_t sock, struct sockaddr *addr, 
     return;
   }
 
-  RemoteClient *client = new RemoteClient(base_, dnsbase_, event, cipher_->NewCrypto());
+  RemoteClient *client = new RemoteClient(base_, dnsbase_, cipher_->NewCrypto(), event);
   client->Startup();
 }
 
-RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, bufferevent *client, StreamCrypto *crypto)
-    : base_(base), dnsbase_(dnsbase), client_(client), crypto_(crypto)
+RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client)
+    : base_(base), dnsbase_(dnsbase), crypto_(crypto), client_(client)
 {
 }
 
@@ -186,7 +186,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
       } else {
         sockaddr_in6 *sin6 = (sockaddr_in6 *)&sa;
         sin6->sin6_family = AF_INET6;
-        memcpy(sin6->sin6_addr.s6_bytes, data + addr_pos, addr_len);
+        memcpy(sin6->sin6_addr.s6_addr, data + addr_pos, addr_len);
         sin6->sin6_port = htons(port);
       }
       bufferevent_socket_connect(target_, (sockaddr *)&sa, sizeof(sa));
@@ -208,6 +208,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     bufferevent_write_buffer(target_, decoded);
 
     if (evbuffer_get_length(bufferevent_get_output(target_)) > MAX_OUTPUT) {
+      client_busy_ = true;
       bufferevent_disable(client_, EV_READ);
     }
   }
@@ -215,7 +216,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
 
 void RemoteClient::HandleClientEmpty()
 {
-  if (step_ == STEP_TRANSPORT) {
+  if (step_ == STEP_TRANSPORT && target_busy_) {
+    target_busy_ = false;
     bufferevent_enable(target_, EV_READ);
   }
 }
@@ -243,13 +245,15 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
   evbuffer_free(encoded);
 
   if (evbuffer_get_length(bufferevent_get_output(client_)) > MAX_OUTPUT) {
+    target_busy_ = true;
     bufferevent_disable(target_, EV_READ);
   }
 }
 
 void RemoteClient::HandleTargetEmpty()
 {
-  if (step_ == STEP_TRANSPORT) {
+  if (step_ == STEP_TRANSPORT && client_busy_) {
+    client_busy_ = false;
     bufferevent_enable(client_, EV_READ);
   }
 }
