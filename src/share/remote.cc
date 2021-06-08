@@ -59,11 +59,15 @@ RemoteClient::~RemoteClient()
 
 void RemoteClient::Startup()
 {
-  bufferevent_setcb(client_, OnClientRead, NULL, OnClientEvent, this);
+  bufferevent_setcb(client_, OnClientRead, OnClientWrite, OnClientEvent, this);
   bufferevent_enable(client_, EV_READ | EV_WRITE);
 }
 
-void RemoteClient::Cleanup() { delete this; }
+void RemoteClient::Cleanup()
+{
+  step_ = STEP_TERMINATE;
+  delete this;
+}
 
 void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
 {
@@ -167,7 +171,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     }
 
     step_ = STEP_CONNECT;
-    bufferevent_setcb(target_, OnTargetRead, NULL, OnTargetEvent, this);
+    bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent, this);
     bufferevent_enable(target_, EV_READ | EV_WRITE);
     if (type == 3) {
       bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
