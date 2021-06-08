@@ -7,7 +7,7 @@
 
 void quit(const char *message)
 {
-  fputs(message, stderr);
+  fprintf(stderr, "%s\n", message);
   exit(EXIT_FAILURE);
 }
 
@@ -22,9 +22,12 @@ void usage(const char *app)
 
   fprintf(stderr,
           "Usage: %s <options>\n"
+          "Options:\n"
           " -p or --port <port>, range 1-65535\n"
           " -m or --algorithm <algorithm>\n"
-          " -s or --password <password>",
+          "    supported: chcha20, chch20-ietf\n"
+          " -s or --password <password>\n"
+          "\n",
           name);
   exit(EXIT_FAILURE);
 }
@@ -48,7 +51,7 @@ int main(int argc, char *argv[])
                                   {0, 0, 0, 0}};
 
   int port = 51080;
-  std::string algorithm("chacha20-ietf"), password("w*akn*ts*cr*t");
+  std::string algorithm, password;
   while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
     switch (opt) {
       case 'p':
@@ -70,31 +73,34 @@ int main(int argc, char *argv[])
   }
 
   if (port < 1 || port > 65535) {
-    quit("invali option: port\n");
+    quit("invalid option: port");
   }
 
   if (algorithm.empty()) {
-    quit("invali option: algorithm\n");
+    quit("invalid option: algorithm");
   }
 
   if (password.empty()) {
-    quit("invali option: password\n");
+    quit("invalid option: password");
   }
 
   if (sodium_init()) {
-    quit("sodium_init error");
+    quit("incredible: sodium_init error");
   }
 
   StreamCipher *cipher = StreamCipher::NewInstance(algorithm.c_str(), password.c_str());
+  if (!cipher) {
+    quit("invalid option: algorithm, not supported");
+  }
 
   event_base *base = event_base_new();
   if (!base) {
-    quit("event_base_new error");
+    quit("incredible: event_base_new error");
   }
 
   evdns_base *dnsbase = evdns_base_new(base, 1);
   if (!dnsbase) {
-    quit("evdns_base_new error");
+    quit("incredible: evdns_base_new error");
   }
 
   std::string error;
@@ -103,6 +109,8 @@ int main(int argc, char *argv[])
   if (!server->Startup(error)) {
     quit(error.c_str());
   }
+
+  printf("listen on %d, algorithm: %s ...\n", port, algorithm.c_str());
 
   event_base_dispatch(base);
 
