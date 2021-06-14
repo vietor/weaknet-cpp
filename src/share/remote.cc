@@ -209,7 +209,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     bufferevent_write_buffer(target_, decoded);
 
     if (evbuffer_get_length(bufferevent_get_output(target_)) > MAX_OUTPUT) {
-      client_busy_ = true;
+      target_busy_ = true;
       bufferevent_disable(client_, EV_READ);
     }
   }
@@ -217,8 +217,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
 
 void RemoteClient::HandleClientEmpty()
 {
-  if (step_ == STEP_TRANSPORT && target_busy_) {
-    target_busy_ = false;
+  if (step_ == STEP_TRANSPORT && client_busy_) {
+    client_busy_ = false;
     bufferevent_enable(target_, EV_READ);
   }
 }
@@ -246,15 +246,15 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
   evbuffer_free(encoded);
 
   if (evbuffer_get_length(bufferevent_get_output(client_)) > MAX_OUTPUT) {
-    target_busy_ = true;
+    client_busy_ = true;
     bufferevent_disable(target_, EV_READ);
   }
 }
 
 void RemoteClient::HandleTargetEmpty()
 {
-  if (step_ == STEP_TRANSPORT && client_busy_) {
-    client_busy_ = false;
+  if (step_ == STEP_TRANSPORT && target_busy_) {
+    target_busy_ = false;
     bufferevent_enable(client_, EV_READ);
   }
 }
