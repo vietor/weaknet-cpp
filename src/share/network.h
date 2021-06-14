@@ -24,6 +24,3 @@
 #include <event2/event_struct.h>
 #include <event2/listener.h>
 
-#include <memory>
-#include <string>
-#include <string.h>

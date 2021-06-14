@@ -55,6 +55,7 @@ RemoteClient::~RemoteClient()
   if (target_) {
     bufferevent_free(target_);
   }
+  crypto_->Release();
 }
 
 void RemoteClient::Startup()
@@ -65,6 +66,7 @@ void RemoteClient::Startup()
 
 void RemoteClient::Cleanup(const char *reason)
 {
+  dump("cleanup: client: %d, target: %d, step: %d, %s\n", bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0, step_, reason);
   step_ = STEP_TERMINATE;
   delete this;
 }

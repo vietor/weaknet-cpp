@@ -1,9 +1,13 @@
 #pragma once
 
 #include <sodium.h>
+#include <string.h>
 
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "debug.h"
 #include "network.h"
 
 #define CIPHER_MAX_IV_SIZE 16
