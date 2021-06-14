@@ -46,7 +46,7 @@ std::vector<unsigned char> StreamCrypto::help_buffer_;
 
 StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
 {
-  memset(&cipher_node_key_, 0, sizeof(CipherNodeKey));
+  memset(&cipher_node_key_, 0, sizeof(cipher_node_key_));
   cipher_node_key_.key_size = cipher_key->key_size;
   cipher_node_key_.iv_size = cipher_key->iv_size;
   memcpy(cipher_node_key_.key, cipher_key->key, CIPHER_MAX_KEY_SIZE);
@@ -56,6 +56,14 @@ StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_
 StreamCrypto::~StreamCrypto() {}
 
 void StreamCrypto::Release() { delete this; }
+
+unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
+{
+  if (size >= help_buffer_.size()) {
+    help_buffer_.resize(size * 1.5);
+  }
+  return help_buffer_.data();
+}
 
 evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
 {
@@ -76,13 +84,10 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
   size_t code_len = padding + data_len;
   unsigned char *code = evbuffer_pullup(buf, data_len);
   if (padding) {
-    if (code_len > help_buffer_.size()) {
-      help_buffer_.resize(code_len * 1.5);
-    }
-    unsigned char *tmp = &help_buffer_[0];
-    memset(tmp, 0, padding);
-    memcpy(tmp + padding, code, data_len);
-    code = tmp;
+    unsigned char *cache = GetHelperBuffer(code_len);
+    memset(cache, 0, padding);
+    memcpy(cache + padding, code, data_len);
+    code = cache;
   }
 
   struct evbuffer_iovec v;
@@ -126,13 +131,10 @@ evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
 
   size_t code_len = padding + data_len;
   if (padding) {
-    if (code_len > help_buffer_.size()) {
-      help_buffer_.resize(code_len * 1.5);
-    }
-    unsigned char *tmp = &help_buffer_[0];
-    memset(tmp, 0, padding);
-    memcpy(tmp + padding, code, data_len);
-    code = tmp;
+    unsigned char *cache = GetHelperBuffer(code_len);
+    memset(cache, 0, padding);
+    memcpy(cache + padding, code, data_len);
+    code = cache;
   }
 
   struct evbuffer_iovec v;

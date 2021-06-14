@@ -38,6 +38,8 @@ class StreamCrypto
   StreamCrypto(unsigned int cipher, CipherKey *cipher_key);
   ~StreamCrypto();
 
+  static unsigned char *GetHelperBuffer(size_t size);
+
   bool en_iv_ = false;
   size_t en_bytes_ = 0;
   bool de_iv_ = false;
