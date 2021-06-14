@@ -17,7 +17,6 @@ struct CipherKey {
   unsigned int key_size;
   unsigned int iv_size;
   unsigned char key[CIPHER_MAX_KEY_SIZE];
-  unsigned char iv[CIPHER_MAX_IV_SIZE];
 };
 
 struct CipherNodeKey {

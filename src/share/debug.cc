@@ -15,14 +15,13 @@ void dump(const char* format, ...)
   va_end(ap);
 }
 
-void dump_hex(const char* data, int size, const char* title)
+void dump_hex(const void* data, int size, const char* title)
 {
   char tmp[32];
   std::string out;
 
   if (title) {
     out += title;
-    out += "\n";
   }
 
   for (int i = 0; i < size; ++i) {
@@ -31,7 +30,7 @@ void dump_hex(const char* data, int size, const char* title)
       sprintf(tmp, "%04X", (unsigned int)i);
       out += tmp;
     }
-    sprintf(tmp, " %02X", (unsigned char)data[i]);
+    sprintf(tmp, " %02X", ((unsigned char*)data)[i]);
     out += tmp;
   }
 

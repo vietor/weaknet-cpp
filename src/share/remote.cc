@@ -66,7 +66,11 @@ void RemoteClient::Startup()
 
 void RemoteClient::Cleanup(const char *reason)
 {
-  dump("cleanup: client: %d, target: %d, step: %d, %s\n", bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0, step_, reason);
+#if USE_DEBUG
+  if (strstr(reason, "error")) {
+    dump("cleanup: client: %d, target: %d, step: %d, %s\n", bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0, step_, reason);
+  }
+#endif
   step_ = STEP_TERMINATE;
   delete this;
 }
@@ -177,26 +181,20 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     bufferevent_enable(target_, EV_READ | EV_WRITE);
     if (type == 3) {
       data[addr_pos + addr_len] = '\0';
-      dump("connect host: %s, port: %d\n", data, port);
       bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
     } else {
       sockaddr_storage sa;
       memset(&sa, 0, sizeof(sa));
-#if USE_DEBUG
-      char addrbuf[INET6_ADDRSTRLEN];
-#endif
       if (type == 1) {
         sockaddr_in *sin = (sockaddr_in *)&sa;
         sin->sin_family = AF_INET;
         memcpy(&sin->sin_addr.s_addr, data + addr_pos, addr_len);
         sin->sin_port = htons(port);
-        dump("connect ipv4: %s, port: %d\n", evutil_inet_ntop(AF_INET, &sin->sin_addr, addrbuf, sizeof(addrbuf)), port);
       } else {
         sockaddr_in6 *sin6 = (sockaddr_in6 *)&sa;
         sin6->sin6_family = AF_INET6;
         memcpy(sin6->sin6_addr.s6_addr, data + addr_pos, addr_len);
         sin6->sin6_port = htons(port);
-        dump("connect ipv6: %s, port: %d\n", evutil_inet_ntop(AF_INET, &sin6->sin6_addr, addrbuf, sizeof(addrbuf)), port);
       }
       bufferevent_socket_connect(target_, (sockaddr *)&sa, sizeof(sa));
     }

@@ -38,8 +38,6 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
       out->key[j] = md_buf[i];
     }
   }
-
-  randombytes_buf(out->iv, iv_size);
 }
 
 std::vector<unsigned char> StreamCrypto::help_buffer_;
@@ -50,7 +48,7 @@ StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_
   cipher_node_key_.key_size = cipher_key->key_size;
   cipher_node_key_.iv_size = cipher_key->iv_size;
   memcpy(cipher_node_key_.key, cipher_key->key, CIPHER_MAX_KEY_SIZE);
-  memcpy(cipher_node_key_.encode_iv, cipher_key->iv, CIPHER_MAX_IV_SIZE);
+  randombytes_buf(cipher_node_key_.encode_iv, cipher_key->iv_size);
 }
 
 StreamCrypto::~StreamCrypto() {}

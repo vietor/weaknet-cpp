@@ -27,6 +27,7 @@ void usage(const char *app)
           " -m or --algorithm <algorithm>\n"
           "    supported: chcha20, chch20-ietf\n"
           " -s or --password <password>\n"
+          " - or --help\n"
           "\n",
           name);
   exit(EXIT_FAILURE);
