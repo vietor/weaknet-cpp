@@ -32,7 +32,7 @@ class RemoteClient
 
  private:
   ~RemoteClient();
-  void Cleanup();
+  void Cleanup(const char *reason);
 
   static void OnClientRead(bufferevent *bev, void *ctx);
   static void OnClientWrite(bufferevent *bev, void *ctx);

@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     quit("incredible: event_base_new error");
   }
 
-  evdns_base *dnsbase = evdns_base_new(base, 1);
+  evdns_base *dnsbase = evdns_base_new(base, EVDNS_BASE_INITIALIZE_NAMESERVERS);
   if (!dnsbase) {
     quit("incredible: evdns_base_new error");
   }

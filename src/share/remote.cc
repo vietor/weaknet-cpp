@@ -63,7 +63,7 @@ void RemoteClient::Startup()
   bufferevent_enable(client_, EV_READ | EV_WRITE);
 }
 
-void RemoteClient::Cleanup()
+void RemoteClient::Cleanup(const char *reason)
 {
   step_ = STEP_TERMINATE;
   delete this;
@@ -78,7 +78,7 @@ void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
     self->HandleClientRead(buf);
   else {
     evbuffer_free(buf);
-    self->Cleanup();
+    self->Cleanup("client read error");
   }
 }
 
@@ -87,8 +87,8 @@ void RemoteClient::OnClientWrite(bufferevent *bev, void *ctx) { ((RemoteClient *
 void RemoteClient::OnClientEvent(bufferevent *bev, short what, void *ctx)
 {
   RemoteClient *self = (RemoteClient *)ctx;
-  if (what & BEV_EVENT_ERROR) {
-    self->Cleanup();
+  if (what & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
+    self->Cleanup("client closed");
   }
 }
 
@@ -101,7 +101,7 @@ void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx)
     self->HandleTargetRead(buf);
   else {
     evbuffer_free(buf);
-    self->Cleanup();
+    self->Cleanup("target read error");
   }
 }
 
@@ -113,7 +113,7 @@ void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx)
   if (what & BEV_EVENT_CONNECTED) {
     self->HandleTargetReady();
   } else if (what & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
-    self->Cleanup();
+    self->Cleanup("target closed");
   }
 }
 
@@ -122,7 +122,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   evbuffer *decoded = crypto_->Decrypt(buf);
   evbuffer_free(buf);
   if (!decoded) {
-    Cleanup();
+    Cleanup("decode client error");
     return;
   }
 
@@ -131,7 +131,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
     if (data_len < 2) {
-      Cleanup();
+      Cleanup("bad protocol header #1");
       return;
     }
 
@@ -154,19 +154,19 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
 
     int drain_len = addr_pos + addr_len + 2;
     if (addr_len < 1 || drain_len > data_len) {
-      Cleanup();
+      Cleanup("bad protocol header #2");
       return;
     }
 
     unsigned short port = ntohs(*(unsigned short *)(data + addr_pos + addr_len));
     if (!port) {
-      Cleanup();
+      Cleanup("bad protocol port");
       return;
     }
 
     target_ = bufferevent_socket_new(base_, -1, BEV_OPT_CLOSE_ON_FREE);
     if (!target_) {
-      Cleanup();
+      Cleanup("incredible: bufferevent_socket_new");
       return;
     }
 
@@ -174,6 +174,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent, this);
     bufferevent_enable(target_, EV_READ | EV_WRITE);
     if (type == 3) {
+      data[addr_pos + addr_len] = '\0';
       bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
     } else {
       sockaddr_storage sa;
@@ -237,7 +238,7 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
   evbuffer *encoded = crypto_->Encrypt(buf);
   evbuffer_free(buf);
   if (!encoded) {
-    Cleanup();
+    Cleanup("encode target error");
     return;
   }
 
