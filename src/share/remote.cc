@@ -49,11 +49,11 @@ RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *
 RemoteClient::~RemoteClient()
 {
   bufferevent_free(client_);
-  if (pedding_) {
-    evbuffer_free(pedding_);
-  }
   if (target_) {
     bufferevent_free(target_);
+  }
+  if (target_cached_) {
+    evbuffer_free(target_cached_);
   }
   crypto_->Release();
 }
@@ -80,7 +80,7 @@ void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
     self->HandleClientRead(buf);
   else {
     evbuffer_free(buf);
-    self->Cleanup("client read error");
+    self->Cleanup("error: client read");
   }
 }
 
@@ -103,7 +103,7 @@ void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx)
     self->HandleTargetRead(buf);
   else {
     evbuffer_free(buf);
-    self->Cleanup("target read error");
+    self->Cleanup("error: target read");
   }
 }
 
@@ -124,7 +124,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   evbuffer *decoded = crypto_->Decrypt(buf);
   evbuffer_free(buf);
   if (!decoded) {
-    Cleanup("decode client error");
+    Cleanup("error: client decrypt");
     return;
   }
 
@@ -133,7 +133,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
     if (data_len < 2) {
-      Cleanup("bad protocol header #1");
+      Cleanup("error: proxy header #1");
       return;
     }
 
@@ -156,13 +156,13 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
 
     int drain_len = addr_pos + addr_len + 2;
     if (addr_len < 1 || drain_len > data_len) {
-      Cleanup("bad protocol header #2");
+      Cleanup("error proxy header #2");
       return;
     }
 
     unsigned short port = ntohs(*(unsigned short *)(data + addr_pos + addr_len));
     if (!port) {
-      Cleanup("bad protocol port");
+      Cleanup("error proxy header #3");
       return;
     }
 
@@ -177,35 +177,41 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     bufferevent_enable(target_, EV_READ | EV_WRITE);
     if (type == 3) {
       data[addr_pos + addr_len] = '\0';
+      dump("connect host: %s, port: %d\n", data, port);
       bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
     } else {
       sockaddr_storage sa;
       memset(&sa, 0, sizeof(sa));
+#if USE_DEBUG
+      char addrbuf[INET6_ADDRSTRLEN];
+#endif
       if (type == 1) {
         sockaddr_in *sin = (sockaddr_in *)&sa;
         sin->sin_family = AF_INET;
         memcpy(&sin->sin_addr.s_addr, data + addr_pos, addr_len);
         sin->sin_port = htons(port);
+        dump("connect ipv4: %s, port: %d\n", evutil_inet_ntop(AF_INET, &sin->sin_addr, addrbuf, sizeof(addrbuf)), port);
       } else {
         sockaddr_in6 *sin6 = (sockaddr_in6 *)&sa;
         sin6->sin6_family = AF_INET6;
         memcpy(sin6->sin6_addr.s6_addr, data + addr_pos, addr_len);
         sin6->sin6_port = htons(port);
+        dump("connect ipv6: %s, port: %d\n", evutil_inet_ntop(AF_INET, &sin6->sin6_addr, addrbuf, sizeof(addrbuf)), port);
       }
       bufferevent_socket_connect(target_, (sockaddr *)&sa, sizeof(sa));
     }
 
     if (drain_len < data_len) {
       evbuffer_drain(decoded, drain_len);
-      pedding_ = decoded;
+      target_cached_ = decoded;
       decoded_clear.release();
     }
   } else if (step_ == STEP_CONNECT) {
-    if (!pedding_) {
-      pedding_ = decoded;
+    if (!target_cached_) {
+      target_cached_ = decoded;
       decoded_clear.release();
     } else {
-      evbuffer_add_buffer(pedding_, decoded);
+      evbuffer_add_buffer(target_cached_, decoded);
     }
   } else {
     bufferevent_write_buffer(target_, decoded);
@@ -228,10 +234,10 @@ void RemoteClient::HandleClientEmpty()
 void RemoteClient::HandleTargetReady()
 {
   step_ = STEP_TRANSPORT;
-  if (pedding_) {
-    bufferevent_write_buffer(target_, pedding_);
-    evbuffer_free(pedding_);
-    pedding_ = nullptr;
+  if (target_cached_) {
+    bufferevent_write_buffer(target_, target_cached_);
+    evbuffer_free(target_cached_);
+    target_cached_ = nullptr;
   }
 }
 
@@ -240,7 +246,7 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
   evbuffer *encoded = crypto_->Encrypt(buf);
   evbuffer_free(buf);
   if (!encoded) {
-    Cleanup("encode target error");
+    Cleanup("error: target encrypt");
     return;
   }
 

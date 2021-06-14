@@ -52,8 +52,8 @@ class RemoteClient
   StreamCrypto *crypto_;
   bufferevent *client_;
   RunStep step_ = STEP_INIT;
-  evbuffer *pedding_ = nullptr;
   bufferevent *target_ = nullptr;
+  evbuffer *target_cached_ = nullptr;
   bool client_busy_ = false;
   bool target_busy_ = false;
 };
