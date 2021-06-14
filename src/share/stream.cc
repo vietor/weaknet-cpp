@@ -18,15 +18,14 @@ StreamCipherInfo supported_ciphers[] = {{"chacha20", CHACHA20, crypto_stream_cha
 static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
 {
   MD5_CTX md;
-  unsigned int i, j, addmd, total_size;
+  unsigned int i, j, addmd;
   size_t password_len = strlen(password);
   unsigned char md_buf[MD5_DIGEST_LENGTH];
 
   memset(out, 0, sizeof(*out));
   out->key_size = key_size;
   out->iv_size = iv_size;
-  total_size = key_size + iv_size;
-  for (j = 0, addmd = 0; j < total_size; addmd++) {
+  for (j = 0, addmd = 0; j < key_size; addmd++) {
     MD5_Init(&md);
     if (addmd) {
       MD5_Update(&md, md_buf, MD5_DIGEST_LENGTH);
@@ -35,12 +34,8 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
     MD5_Final(md_buf, &md);
 
     for (i = 0; i < MD5_DIGEST_LENGTH; i++, j++) {
-      if (j >= total_size) break;
-      if (j < key_size) {
-        out->key[j] = md_buf[i];
-      } else {
-        out->iv[j - key_size] = md_buf[i];
-      }
+      if (j >= key_size) break;
+      out->key[j] = md_buf[i];
     }
   }
 
