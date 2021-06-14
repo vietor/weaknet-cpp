@@ -169,6 +169,7 @@ StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *passw
   for (size_t i = 0; i < sizeof(supported_ciphers) / sizeof(supported_ciphers[0]); ++i) {
     if (strcmp(algorithm, supported_ciphers[i].name) == 0) {
       info = &supported_ciphers[i];
+      break;
     }
   }
 
