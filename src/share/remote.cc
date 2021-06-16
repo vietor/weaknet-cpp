@@ -137,7 +137,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
     if (data_len < 2) {
-      Cleanup("error: proxy header #1");
+      Cleanup("error: proxy header, size");
       return;
     }
 
@@ -158,15 +158,20 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
         break;
     }
 
+    if (addr_len < 1) {
+      Cleanup("error proxy header, type");
+      return;
+    }
+
     int drain_len = addr_pos + addr_len + 2;
-    if (addr_len < 1 || drain_len > data_len) {
-      Cleanup("error proxy header #2");
+    if (drain_len > data_len) {
+      Cleanup("error proxy header, addr");
       return;
     }
 
     unsigned short port = ntohs(*(unsigned short *)(data + addr_pos + addr_len));
     if (!port) {
-      Cleanup("error proxy header #3");
+      Cleanup("error proxy header, port");
       return;
     }
 
