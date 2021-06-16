@@ -19,28 +19,40 @@ struct CipherKey {
   unsigned char key[CIPHER_MAX_KEY_SIZE];
 };
 
-struct CipherNodeKey {
-  unsigned int key_size;
-  unsigned int iv_size;
-  unsigned char key[CIPHER_MAX_KEY_SIZE];
-  unsigned char encode_iv[CIPHER_MAX_IV_SIZE];
-  unsigned char decode_iv[CIPHER_MAX_IV_SIZE];
+class StreamCrypto
+{
+ protected:
+  StreamCrypto();
+  virtual ~StreamCrypto() = 0;
+
+ public:
+  virtual void Release();
+
+  virtual evbuffer *Encrypt(evbuffer *buf) = 0;
+  virtual evbuffer *Decrypt(evbuffer *buf) = 0;
 };
 
-class StreamCrypto
+class StreamBasicCrypto : StreamCrypto
 {
   friend class StreamCipher;
 
- public:
-  void Release();
+  struct CipherNodeKey {
+    unsigned int key_size;
+    unsigned int iv_size;
+    unsigned char key[CIPHER_MAX_KEY_SIZE];
+    unsigned char encode_iv[CIPHER_MAX_IV_SIZE];
+    unsigned char decode_iv[CIPHER_MAX_IV_SIZE];
+  };
 
+ protected:
+  StreamBasicCrypto(unsigned int cipher, CipherKey *cipher_key);
+  ~StreamBasicCrypto();
+
+ public:
   evbuffer *Encrypt(evbuffer *buf);
   evbuffer *Decrypt(evbuffer *buf);
 
  private:
-  StreamCrypto(unsigned int cipher, CipherKey *cipher_key);
-  ~StreamCrypto();
-
   static unsigned char *GetHelperBuffer(size_t size);
 
   bool en_iv_ = false;

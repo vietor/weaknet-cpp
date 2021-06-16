@@ -42,9 +42,14 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
   }
 }
 
-std::vector<unsigned char> StreamCrypto::help_buffer_;
+StreamCrypto::StreamCrypto() {}
+StreamCrypto::~StreamCrypto() {}
 
-StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
+void StreamCrypto::Release() { delete this; }
+
+std::vector<unsigned char> StreamBasicCrypto::help_buffer_;
+
+StreamBasicCrypto::StreamBasicCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
 {
   memset(&cipher_node_key_, 0, sizeof(cipher_node_key_));
   cipher_node_key_.key_size = cipher_key->key_size;
@@ -53,11 +58,9 @@ StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_
   randombytes_buf(cipher_node_key_.encode_iv, cipher_key->iv_size);
 }
 
-StreamCrypto::~StreamCrypto() {}
+StreamBasicCrypto::~StreamBasicCrypto() {}
 
-void StreamCrypto::Release() { delete this; }
-
-unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
+unsigned char *StreamBasicCrypto::GetHelperBuffer(size_t size)
 {
   if (size >= help_buffer_.size()) {
     help_buffer_.resize(size * 1.5);
@@ -65,7 +68,7 @@ unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
   return help_buffer_.data();
 }
 
-evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
+evbuffer *StreamBasicCrypto::Encrypt(evbuffer *buf)
 {
   size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
@@ -112,7 +115,7 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
   return target;
 }
 
-evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
+evbuffer *StreamBasicCrypto::Decrypt(evbuffer *buf)
 {
   size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
@@ -160,7 +163,7 @@ StreamCipher::StreamCipher() {}
 
 StreamCipher::~StreamCipher() {}
 
-StreamCrypto *StreamCipher::NewCrypto() { return new StreamCrypto(cipher_, &cipher_key_); };
+StreamCrypto *StreamCipher::NewCrypto() { return new StreamBasicCrypto(cipher_, &cipher_key_); };
 
 StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *password)
 {
