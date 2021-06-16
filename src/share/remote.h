@@ -12,7 +12,8 @@ class RemoteServer
 
  private:
   static void OnConnected(evconnlistener *listen, evutil_socket_t sock, struct sockaddr *addr, int len, void *ctx);
-  void HandleConnected(evutil_socket_t sock, struct sockaddr *addr, int len);
+
+  void HandleConnected(evutil_socket_t sock);
 
   event_base *base_;
   evdns_base *dnsbase_;
@@ -23,7 +24,7 @@ class RemoteServer
 
 class RemoteClient
 {
-  enum RunStep { STEP_INIT = 0, STEP_CONNECT, STEP_TRANSPORT, STEP_TERMINATE };
+  enum RuningStep { STEP_INIT = 0, STEP_CONNECT, STEP_TRANSPORT, STEP_TERMINATE };
 
  public:
   RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client);
@@ -51,7 +52,7 @@ class RemoteClient
   evdns_base *dnsbase_;
   StreamCrypto *crypto_;
   bufferevent *client_;
-  RunStep step_ = STEP_INIT;
+  RuningStep step_ = STEP_INIT;
   bufferevent *target_ = nullptr;
   evbuffer *target_cached_ = nullptr;
   bool client_busy_ = false;

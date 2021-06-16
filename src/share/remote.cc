@@ -7,7 +7,12 @@ RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, StreamCipher *
 {
 }
 
-RemoteServer::~RemoteServer() {}
+RemoteServer::~RemoteServer()
+{
+  if (listener_) {
+    evconnlistener_free(listener_);
+  }
+}
 
 bool RemoteServer::Startup(std::string &error)
 {
@@ -19,17 +24,16 @@ bool RemoteServer::Startup(std::string &error)
   listener_ = evconnlistener_new_bind(base_, OnConnected, this, LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE, 128, (sockaddr *)&sin, sizeof(sin));
   if (!listener_) {
     error = "bad listen on port: " + std::to_string(port_);
-    return false;
   }
-  return true;
+  return !!listener_;
 }
 
 void RemoteServer::OnConnected(evconnlistener *listen, evutil_socket_t sock, struct sockaddr *addr, int len, void *ctx)
 {
-  ((RemoteServer *)ctx)->HandleConnected(sock, addr, len);
+  ((RemoteServer *)ctx)->HandleConnected(sock);
 }
 
-void RemoteServer::HandleConnected(evutil_socket_t sock, struct sockaddr *addr, int len)
+void RemoteServer::HandleConnected(evutil_socket_t sock)
 {
   struct bufferevent *event = bufferevent_socket_new(base_, sock, BEV_OPT_CLOSE_ON_FREE);
   if (!event) {
@@ -37,8 +41,7 @@ void RemoteServer::HandleConnected(evutil_socket_t sock, struct sockaddr *addr, 
     return;
   }
 
-  RemoteClient *client = new RemoteClient(base_, dnsbase_, cipher_->NewCrypto(), event);
-  client->Startup();
+  (new RemoteClient(base_, dnsbase_, cipher_->NewCrypto(), event))->Startup();
 }
 
 RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client)
@@ -80,9 +83,9 @@ void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
   RemoteClient *self = (RemoteClient *)ctx;
   evbuffer *buf = evbuffer_new();
   int ret = bufferevent_read_buffer(bev, buf);
-  if (ret == 0)
+  if (ret == 0) {
     self->HandleClientRead(buf);
-  else {
+  } else {
     evbuffer_free(buf);
     self->Cleanup("error: client read");
   }
@@ -136,7 +139,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
 
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
-    if (data_len < 2) {
+    if (data_len < 4) {
       Cleanup("error: proxy header, size");
       return;
     }
@@ -155,12 +158,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
         addr_len = 16;
         break;
       default:
-        break;
-    }
-
-    if (addr_len < 1) {
-      Cleanup("error proxy header, type");
-      return;
+        Cleanup("error proxy header, type");
+        return;
     }
 
     int drain_len = addr_pos + addr_len + 2;
@@ -184,21 +183,24 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     step_ = STEP_CONNECT;
     bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent, this);
     bufferevent_enable(target_, EV_READ | EV_WRITE);
+
+    char *addr = (char *)data + addr_pos;
     if (type == 3) {
-      data[addr_pos + addr_len] = '\0';
-      bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, (char *)(data + addr_pos), port);
+      addr[addr_len] = '\0';
+      bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, addr, port);
     } else {
       sockaddr_storage sa;
+
       memset(&sa, 0, sizeof(sa));
       if (type == 1) {
         sockaddr_in *sin = (sockaddr_in *)&sa;
         sin->sin_family = AF_INET;
-        memcpy(&sin->sin_addr.s_addr, data + addr_pos, addr_len);
+        memcpy(&sin->sin_addr.s_addr, addr, addr_len);
         sin->sin_port = htons(port);
       } else {
         sockaddr_in6 *sin6 = (sockaddr_in6 *)&sa;
         sin6->sin6_family = AF_INET6;
-        memcpy(sin6->sin6_addr.s6_addr, data + addr_pos, addr_len);
+        memcpy(sin6->sin6_addr.s6_addr, addr, addr_len);
         sin6->sin6_port = htons(port);
       }
       bufferevent_socket_connect(target_, (sockaddr *)&sa, sizeof(sa));

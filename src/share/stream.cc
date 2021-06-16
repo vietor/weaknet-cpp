@@ -3,6 +3,8 @@
 #include <openssl/md5.h>
 #include <sodium/utils.h>
 
+#define SODIUM_BLOCK_SIZE 64
+
 enum StreamCipherMode { CHACHA20 = 0, CHACHA20_IETF };
 
 struct StreamCipherInfo {
@@ -65,8 +67,8 @@ unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
 
 evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
 {
-  size_t counter = en_bytes_ / 64;
-  size_t padding = en_bytes_ % 64;
+  size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
+  size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
   size_t data_len = evbuffer_get_length(buf);
   size_t code_pos = 0, drain_len = padding;
 
@@ -101,6 +103,7 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
     memcpy((unsigned char *)v.iov_base + drain_len, cipher_node_key_.encode_iv, cipher_node_key_.iv_size);
   }
   en_bytes_ += data_len;
+
   v.iov_len = code_pos + code_len;
   evbuffer_commit_space(target, &v, 1);
   if (drain_len > 0) {
@@ -111,8 +114,8 @@ evbuffer *StreamCrypto::Encrypt(evbuffer *buf)
 
 evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
 {
-  size_t counter = de_bytes_ / 64;
-  size_t padding = de_bytes_ % 64;
+  size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
+  size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
   size_t data_len = evbuffer_get_length(buf);
 
   unsigned char *code = evbuffer_pullup(buf, data_len);
@@ -144,6 +147,7 @@ evbuffer *StreamCrypto::Decrypt(evbuffer *buf)
     crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
   }
   de_bytes_ += data_len;
+
   v.iov_len = code_len;
   evbuffer_commit_space(target, &v, 1);
   if (padding > 0) {
