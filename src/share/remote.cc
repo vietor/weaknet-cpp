@@ -128,9 +128,13 @@ void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx)
 
 void RemoteClient::HandleClientRead(evbuffer *buf)
 {
-  evbuffer *decoded = crypto_->Decrypt(buf);
+  evbuffer *decoded = nullptr;
+  int cret = crypto_->Decrypt(buf, decoded);
   evbuffer_free(buf);
-  if (!decoded) {
+  if (cret == CRYPTO_NEED_NORE) {
+    return;
+  }
+  if (cret != CRYPTO_OK) {
     Cleanup("error: client decrypt");
     return;
   }
@@ -248,9 +252,10 @@ void RemoteClient::HandleTargetReady()
 
 void RemoteClient::HandleTargetRead(evbuffer *buf)
 {
-  evbuffer *encoded = crypto_->Encrypt(buf);
+  evbuffer *encoded = nullptr;
+  int cret = crypto_->Encrypt(buf, encoded);
   evbuffer_free(buf);
-  if (!encoded) {
+  if (cret != CRYPTO_OK) {
     Cleanup("error: target encrypt");
     return;
   }

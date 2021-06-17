@@ -68,7 +68,7 @@ unsigned char *StreamBasicCrypto::GetHelperBuffer(size_t size)
   return help_buffer_.data();
 }
 
-evbuffer *StreamBasicCrypto::Encrypt(evbuffer *buf)
+int StreamBasicCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
 {
   size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
@@ -94,8 +94,8 @@ evbuffer *StreamBasicCrypto::Encrypt(evbuffer *buf)
   }
 
   struct evbuffer_iovec v;
-  evbuffer *target = evbuffer_new();
-  evbuffer_reserve_space(target, code_pos + code_len, &v, 1);
+  out = evbuffer_new();
+  evbuffer_reserve_space(out, code_pos + code_len, &v, 1);
   if (cipher_ == CHACHA20) {
     crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_node_key_.encode_iv, counter, cipher_node_key_.key);
   } else {
@@ -108,14 +108,14 @@ evbuffer *StreamBasicCrypto::Encrypt(evbuffer *buf)
   en_bytes_ += data_len;
 
   v.iov_len = code_pos + code_len;
-  evbuffer_commit_space(target, &v, 1);
+  evbuffer_commit_space(out, &v, 1);
   if (drain_len > 0) {
-    evbuffer_drain(target, drain_len);
+    evbuffer_drain(out, drain_len);
   }
-  return target;
+  return CRYPTO_OK;
 }
 
-evbuffer *StreamBasicCrypto::Decrypt(evbuffer *buf)
+int StreamBasicCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
 {
   size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
@@ -124,9 +124,9 @@ evbuffer *StreamBasicCrypto::Decrypt(evbuffer *buf)
   unsigned char *code = evbuffer_pullup(buf, data_len);
   if (!de_iv_) {
     if (data_len < cipher_node_key_.iv_size) {
-      // broken, maybe never happen
-      return nullptr;
+      return CRYPTO_ERROR;
     }
+
     de_iv_ = true;
     memcpy(cipher_node_key_.decode_iv, code, cipher_node_key_.iv_size);
     code += cipher_node_key_.iv_size;
@@ -142,8 +142,8 @@ evbuffer *StreamBasicCrypto::Decrypt(evbuffer *buf)
   }
 
   struct evbuffer_iovec v;
-  evbuffer *target = evbuffer_new();
-  evbuffer_reserve_space(target, code_len, &v, 1);
+  out = evbuffer_new();
+  evbuffer_reserve_space(out, code_len, &v, 1);
   if (cipher_ == CHACHA20) {
     crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
   } else {
@@ -152,11 +152,11 @@ evbuffer *StreamBasicCrypto::Decrypt(evbuffer *buf)
   de_bytes_ += data_len;
 
   v.iov_len = code_len;
-  evbuffer_commit_space(target, &v, 1);
+  evbuffer_commit_space(out, &v, 1);
   if (padding > 0) {
-    evbuffer_drain(target, padding);
+    evbuffer_drain(out, padding);
   }
-  return target;
+  return CRYPTO_OK;
 }
 
 StreamCipher::StreamCipher() {}

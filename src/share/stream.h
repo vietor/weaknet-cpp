@@ -13,6 +13,12 @@
 #define CIPHER_MAX_IV_SIZE 16
 #define CIPHER_MAX_KEY_SIZE 32
 
+enum {
+  CRYPTO_ERROR = -1,
+  CRYPTO_OK,
+  CRYPTO_NEED_NORE,
+};
+
 struct CipherKey {
   unsigned int key_size;
   unsigned int iv_size;
@@ -28,8 +34,8 @@ class StreamCrypto
  public:
   virtual void Release();
 
-  virtual evbuffer *Encrypt(evbuffer *buf) = 0;
-  virtual evbuffer *Decrypt(evbuffer *buf) = 0;
+  virtual int Encrypt(evbuffer *buf, evbuffer *&out) = 0;
+  virtual int Decrypt(evbuffer *buf, evbuffer *&out) = 0;
 };
 
 class StreamBasicCrypto : StreamCrypto
@@ -49,8 +55,8 @@ class StreamBasicCrypto : StreamCrypto
   ~StreamBasicCrypto();
 
  public:
-  evbuffer *Encrypt(evbuffer *buf);
-  evbuffer *Decrypt(evbuffer *buf);
+  int Encrypt(evbuffer *buf, evbuffer *&out);
+  int Decrypt(evbuffer *buf, evbuffer *&out);
 
  private:
   static unsigned char *GetHelperBuffer(size_t size);
