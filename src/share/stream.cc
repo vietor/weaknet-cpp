@@ -1,6 +1,7 @@
 #include "stream.h"
 
 #include <openssl/md5.h>
+#include <sodium.h>
 #include <sodium/utils.h>
 
 #define SODIUM_BLOCK_SIZE 64
@@ -164,6 +165,15 @@ StreamCipher::StreamCipher() {}
 StreamCipher::~StreamCipher() {}
 
 StreamCrypto *StreamCipher::NewCrypto() { return new StreamBasicCrypto(cipher_, &cipher_key_); };
+
+bool StreamCipher::Init(std::string &error)
+{
+  if (sodium_init()) {
+    error = "incredible: sodium_init error";
+    return false;
+  }
+  return true;
+}
 
 StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *password)
 {

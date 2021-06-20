@@ -1,6 +1,5 @@
 #pragma once
 
-#include <sodium.h>
 #include <string.h>
 
 #include <memory>
@@ -75,6 +74,7 @@ class StreamCipher
  public:
   StreamCrypto *NewCrypto();
 
+  static bool Init(std::string &error);
   static StreamCipher *NewInstance(const char *algorithm, const char *password);
 
  private:

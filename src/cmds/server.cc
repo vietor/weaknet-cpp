@@ -85,8 +85,10 @@ int main(int argc, char *argv[])
     quit("invalid option: password");
   }
 
-  if (sodium_init()) {
-    quit("incredible: sodium_init error");
+  std::string error;
+
+  if (!StreamCipher::Init(error)) {
+    quit(error.c_str());
   }
 
   StreamCipher *cipher = StreamCipher::NewInstance(algorithm.c_str(), password.c_str());
@@ -103,8 +105,6 @@ int main(int argc, char *argv[])
   if (!dnsbase) {
     quit("incredible: evdns_base_new error");
   }
-
-  std::string error;
 
   RemoteServer *server = new RemoteServer(base, dnsbase, cipher, port);
   if (!server->Startup(error)) {
