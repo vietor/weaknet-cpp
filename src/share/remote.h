@@ -1,11 +1,11 @@
 #pragma once
 
-#include "stream.h"
+#include "crypto.h"
 
 class RemoteServer
 {
  public:
-  RemoteServer(event_base *base, evdns_base *dnsbase, StreamCipher *cipher, unsigned short port);
+  RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator, unsigned short port);
   ~RemoteServer();
 
   bool Startup(std::string &error);
@@ -17,7 +17,7 @@ class RemoteServer
 
   event_base *base_;
   evdns_base *dnsbase_;
-  StreamCipher *cipher_;
+  CryptoCreator *creator_;
   unsigned short port_;
   evconnlistener *listener_ = nullptr;
 };
@@ -27,7 +27,7 @@ class RemoteClient
   enum RuningStep { STEP_INIT = 0, STEP_CONNECT, STEP_TRANSPORT, STEP_TERMINATE };
 
  public:
-  RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client);
+  RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto, bufferevent *client);
 
   void Startup();
 
@@ -50,7 +50,7 @@ class RemoteClient
 
   event_base *base_;
   evdns_base *dnsbase_;
-  StreamCrypto *crypto_;
+  Crypto *crypto_;
   bufferevent *client_;
   RuningStep step_ = STEP_INIT;
   bufferevent *target_ = nullptr;

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 #include "../share/remote.h"
-#include "../share/stream.h"
 
 void quit(const char *message)
 {
@@ -87,12 +86,12 @@ int main(int argc, char *argv[])
 
   std::string error;
 
-  if (!StreamCipher::Init(error)) {
+  if (!CryptoCreator::Init(error)) {
     quit(error.c_str());
   }
 
-  StreamCipher *cipher = StreamCipher::NewInstance(algorithm.c_str(), password.c_str());
-  if (!cipher) {
+  CryptoCreator *creator = CryptoCreator::NewInstance(algorithm.c_str(), password.c_str());
+  if (!creator) {
     quit("invalid option: algorithm, not supported");
   }
 
@@ -106,7 +105,7 @@ int main(int argc, char *argv[])
     quit("incredible: evdns_base_new error");
   }
 
-  RemoteServer *server = new RemoteServer(base, dnsbase, cipher, port);
+  RemoteServer *server = new RemoteServer(base, dnsbase, creator, port);
   if (!server->Startup(error)) {
     quit(error.c_str());
   }

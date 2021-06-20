@@ -24,11 +24,11 @@ struct CipherKey {
   unsigned char key[CIPHER_MAX_KEY_SIZE];
 };
 
-class StreamCrypto
+class Crypto
 {
  protected:
-  StreamCrypto();
-  virtual ~StreamCrypto() = 0;
+  Crypto();
+  virtual ~Crypto() = 0;
 
  public:
   virtual void Release();
@@ -37,9 +37,9 @@ class StreamCrypto
   virtual int Decrypt(evbuffer *buf, evbuffer *&out) = 0;
 };
 
-class StreamBasicCrypto : StreamCrypto
+class StreamCrypto : Crypto
 {
-  friend class StreamCipher;
+  friend class CryptoCreator;
 
   struct CipherNodeKey {
     unsigned int key_size;
@@ -50,8 +50,8 @@ class StreamBasicCrypto : StreamCrypto
   };
 
  protected:
-  StreamBasicCrypto(unsigned int cipher, CipherKey *cipher_key);
-  ~StreamBasicCrypto();
+  StreamCrypto(unsigned int cipher, CipherKey *cipher_key);
+  ~StreamCrypto();
 
  public:
   int Encrypt(evbuffer *buf, evbuffer *&out);
@@ -69,17 +69,17 @@ class StreamBasicCrypto : StreamCrypto
   static std::vector<unsigned char> help_buffer_;
 };
 
-class StreamCipher
+class CryptoCreator
 {
  public:
-  StreamCrypto *NewCrypto();
+  Crypto *NewCrypto();
 
   static bool Init(std::string &error);
-  static StreamCipher *NewInstance(const char *algorithm, const char *password);
+  static CryptoCreator *NewInstance(const char *algorithm, const char *password);
 
  private:
-  StreamCipher();
-  ~StreamCipher();
+  CryptoCreator();
+  ~CryptoCreator();
 
   unsigned int cipher_;
   CipherKey cipher_key_;

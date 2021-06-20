@@ -1,4 +1,4 @@
-#include "stream.h"
+#include "crypto.h"
 
 #include <openssl/md5.h>
 #include <sodium.h>
@@ -6,16 +6,16 @@
 
 #define SODIUM_BLOCK_SIZE 64
 
-enum StreamCipherMode { CHACHA20 = 0, CHACHA20_IETF };
+enum CryptoCreatorMode { CHACHA20 = 0, CHACHA20_IETF };
 
-struct StreamCipherInfo {
+struct CryptoCreatorInfo {
   const char *name;
   unsigned int cipher;
   unsigned int key_size;
   unsigned int iv_size;
 };
 
-StreamCipherInfo supported_ciphers[] = {{"chacha20", CHACHA20, crypto_stream_chacha20_KEYBYTES, crypto_stream_chacha20_NONCEBYTES},
+CryptoCreatorInfo supported_ciphers[] = {{"chacha20", CHACHA20, crypto_stream_chacha20_KEYBYTES, crypto_stream_chacha20_NONCEBYTES},
                                         {"chacha20-ietf", CHACHA20_IETF, crypto_stream_chacha20_ietf_KEYBYTES, crypto_stream_chacha20_ietf_NONCEBYTES}};
 
 static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
@@ -43,14 +43,14 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
   }
 }
 
-StreamCrypto::StreamCrypto() {}
-StreamCrypto::~StreamCrypto() {}
+Crypto::Crypto() {}
+Crypto::~Crypto() {}
 
-void StreamCrypto::Release() { delete this; }
+void Crypto::Release() { delete this; }
 
-std::vector<unsigned char> StreamBasicCrypto::help_buffer_;
+std::vector<unsigned char> StreamCrypto::help_buffer_;
 
-StreamBasicCrypto::StreamBasicCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
+StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
 {
   memset(&cipher_node_key_, 0, sizeof(cipher_node_key_));
   cipher_node_key_.key_size = cipher_key->key_size;
@@ -59,9 +59,9 @@ StreamBasicCrypto::StreamBasicCrypto(unsigned int cipher, CipherKey *cipher_key)
   randombytes_buf(cipher_node_key_.encode_iv, cipher_key->iv_size);
 }
 
-StreamBasicCrypto::~StreamBasicCrypto() {}
+StreamCrypto::~StreamCrypto() {}
 
-unsigned char *StreamBasicCrypto::GetHelperBuffer(size_t size)
+unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
 {
   if (size >= help_buffer_.size()) {
     help_buffer_.resize(size * 1.5);
@@ -69,7 +69,7 @@ unsigned char *StreamBasicCrypto::GetHelperBuffer(size_t size)
   return help_buffer_.data();
 }
 
-int StreamBasicCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
+int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
 {
   size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
@@ -116,7 +116,7 @@ int StreamBasicCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
   return CRYPTO_OK;
 }
 
-int StreamBasicCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
+int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
 {
   size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
@@ -160,13 +160,13 @@ int StreamBasicCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
   return CRYPTO_OK;
 }
 
-StreamCipher::StreamCipher() {}
+CryptoCreator::CryptoCreator() {}
 
-StreamCipher::~StreamCipher() {}
+CryptoCreator::~CryptoCreator() {}
 
-StreamCrypto *StreamCipher::NewCrypto() { return new StreamBasicCrypto(cipher_, &cipher_key_); };
+Crypto *CryptoCreator::NewCrypto() { return new StreamCrypto(cipher_, &cipher_key_); };
 
-bool StreamCipher::Init(std::string &error)
+bool CryptoCreator::Init(std::string &error)
 {
   if (sodium_init()) {
     error = "incredible: sodium_init error";
@@ -175,9 +175,9 @@ bool StreamCipher::Init(std::string &error)
   return true;
 }
 
-StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *password)
+CryptoCreator *CryptoCreator::NewInstance(const char *algorithm, const char *password)
 {
-  StreamCipherInfo *info = nullptr;
+  CryptoCreatorInfo *info = nullptr;
   for (size_t i = 0; i < sizeof(supported_ciphers) / sizeof(supported_ciphers[0]); ++i) {
     if (strcmp(algorithm, supported_ciphers[i].name) == 0) {
       info = &supported_ciphers[i];
@@ -187,7 +187,7 @@ StreamCipher *StreamCipher::NewInstance(const char *algorithm, const char *passw
 
   if (!info) return nullptr;
 
-  StreamCipher *out = new StreamCipher();
+  CryptoCreator *out = new CryptoCreator();
   out->cipher_ = info->cipher;
   DeriveCipherKey(&out->cipher_key_, password, info->key_size, info->iv_size);
   return out;

@@ -2,8 +2,8 @@
 
 #define MAX_OUTPUT (512 * 1024)
 
-RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, StreamCipher *cipher, unsigned short port)
-    : base_(base), dnsbase_(dnsbase), cipher_(cipher), port_(port)
+RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator, unsigned short port)
+    : base_(base), dnsbase_(dnsbase), creator_(creator), port_(port)
 {
 }
 
@@ -41,10 +41,10 @@ void RemoteServer::HandleConnected(evutil_socket_t sock)
     return;
   }
 
-  (new RemoteClient(base_, dnsbase_, cipher_->NewCrypto(), event))->Startup();
+  (new RemoteClient(base_, dnsbase_, creator_->NewCrypto(), event))->Startup();
 }
 
-RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, StreamCrypto *crypto, bufferevent *client)
+RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto, bufferevent *client)
     : base_(base), dnsbase_(dnsbase), crypto_(crypto), client_(client)
 {
 }
