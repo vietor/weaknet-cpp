@@ -115,6 +115,7 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
   if (!de_init_) {
     if (source_len < cipher_aead_key_.key_size) {
       evbuffer_free(buf);
+      out = nullptr;
       return CRYPTO_ERROR;
     }
 

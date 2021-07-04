@@ -90,6 +90,7 @@ int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
   if (!de_init_) {
     if (data_len < cipher_stream_key_.iv_size) {
       evbuffer_free(buf);
+      out = nullptr;
       return CRYPTO_ERROR;
     }
 
