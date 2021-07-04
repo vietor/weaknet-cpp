@@ -42,7 +42,7 @@ class Crypto
   virtual int Encrypt(evbuffer *buf, evbuffer *&out) = 0;
   virtual int Decrypt(evbuffer *buf, evbuffer *&out) = 0;
 
-  static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size);
+  static void HKEY_MD5(const char *password, unsigned char *key, unsigned int key_size);
   static void HKDF_SHA1(const unsigned char *salt, int salt_len, const unsigned char *ikm, int ikm_len, const unsigned char *info, int info_len,
                         unsigned char *okm, int okm_len);
 };

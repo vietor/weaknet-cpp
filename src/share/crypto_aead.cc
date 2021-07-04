@@ -9,13 +9,21 @@ const unsigned char SUBKEY_INFO[] = "ss-subkey";
 static inline int crypto_aead_encrypt(unsigned int cipher, unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen,
                                       const unsigned char *npub, const unsigned char *k)
 {
-  return crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
+  if (cipher == CHACHA20_IETF_POLY1305) {
+    return crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
+  } else {
+    return -1;
+  }
 }
 
 static inline int crypto_aead_decrypt(unsigned int cipher, unsigned char *m, unsigned long long *mlen_p, const unsigned char *c, unsigned long long clen,
                                       const unsigned char *npub, const unsigned char *k)
 {
-  return crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
+  if (cipher == CHACHA20_IETF_POLY1305) {
+    return crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
+  } else {
+    return -1;
+  }
 }
 
 AeadCrypto::AeadCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)

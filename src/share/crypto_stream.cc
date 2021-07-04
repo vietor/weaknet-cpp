@@ -5,8 +5,10 @@ static inline int crypto_stream_xor_ic(unsigned int cipher, unsigned char *c, co
 {
   if (cipher == CHACHA20) {
     return crypto_stream_chacha20_xor_ic(c, m, mlen, n, ic, k);
-  } else {
+  } else if (cipher == CHACHA20_IETF) {
     return crypto_stream_chacha20_ietf_xor_ic(c, m, mlen, n, ic, k);
+  } else {
+    return -1;
   }
 }
 

@@ -23,16 +23,13 @@ Crypto::~Crypto() {}
 
 void Crypto::Release() { delete this; }
 
-void Crypto::DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
+void Crypto::HKEY_MD5(const char *password, unsigned char *key, unsigned int key_size)
 {
   MD5_CTX md;
   unsigned int i, j, addmd;
   size_t password_len = strlen(password);
   unsigned char md_buf[MD5_DIGEST_LENGTH];
 
-  memset(out, 0, sizeof(*out));
-  out->key_size = key_size;
-  out->iv_size = iv_size;
   for (j = 0, addmd = 0; j < key_size; addmd++) {
     MD5_Init(&md);
     if (addmd) {
@@ -43,7 +40,7 @@ void Crypto::DeriveCipherKey(CipherKey *out, const char *password, unsigned int 
 
     for (i = 0; i < MD5_DIGEST_LENGTH; i++, j++) {
       if (j >= key_size) break;
-      out->key[j] = md_buf[i];
+      key[j] = md_buf[i];
     }
   }
 }
@@ -119,7 +116,10 @@ CryptoCreator *CryptoCreator::NewInstance(const char *algorithm, const char *pas
 
   CryptoCreator *out = new CryptoCreator();
   out->cipher_ = info->cipher;
-  Crypto::DeriveCipherKey(&out->cipher_key_, password, info->key_size, info->iv_size);
+  memset(&out->cipher_key_, 0, sizeof(out->cipher_key_));
+  out->cipher_key_.key_size = info->key_size;
+  out->cipher_key_.iv_size = info->iv_size;
   out->cipher_key_.tag_size = info->tag_size;
+  Crypto::HKEY_MD5(password, out->cipher_key_.key, info->key_size);
   return out;
 }
