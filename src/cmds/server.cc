@@ -24,7 +24,7 @@ void usage(const char *app)
           "Options:\n"
           " -p or --port <port>, range 1-65535\n"
           " -m or --algorithm <algorithm>\n"
-          "    supported: chcha20, chch20-ietf\n"
+          "    supported: chcha20, chch20-ietf, chacha20-ietf-poly1305\n"
           " -s or --password <password>\n"
           " - or --help\n"
           "\n",

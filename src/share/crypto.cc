@@ -1,24 +1,29 @@
 #include "crypto.h"
 
+#include <openssl/hmac.h>
 #include <openssl/md5.h>
-#include <sodium.h>
-#include <sodium/utils.h>
+#include <openssl/sha.h>
 
-#define SODIUM_BLOCK_SIZE 64
-
-enum CryptoCreatorMode { CHACHA20 = 0, CHACHA20_IETF };
+#include "crypto_aead.h"
+#include "crypto_stream.h"
 
 struct CryptoCreatorInfo {
   const char *name;
   unsigned int cipher;
   unsigned int key_size;
   unsigned int iv_size;
+  unsigned int tag_size;
 };
 
-CryptoCreatorInfo supported_ciphers[] = {{"chacha20", CHACHA20, crypto_stream_chacha20_KEYBYTES, crypto_stream_chacha20_NONCEBYTES},
-                                        {"chacha20-ietf", CHACHA20_IETF, crypto_stream_chacha20_ietf_KEYBYTES, crypto_stream_chacha20_ietf_NONCEBYTES}};
+CryptoCreatorInfo supported_ciphers[] = {
+    {"chacha20", CHACHA20, 32, 8, 0}, {"chacha20-ietf", CHACHA20_IETF, 32, 12, 0}, {"chacha20-ietf-poly1305", CHACHA20_IETF_POLY1305, 32, 12, 16}};
 
-static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
+Crypto::Crypto() {}
+Crypto::~Crypto() {}
+
+void Crypto::Release() { delete this; }
+
+void Crypto::DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size)
 {
   MD5_CTX md;
   unsigned int i, j, addmd;
@@ -43,128 +48,53 @@ static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int k
   }
 }
 
-Crypto::Crypto() {}
-Crypto::~Crypto() {}
-
-void Crypto::Release() { delete this; }
-
-std::vector<unsigned char> StreamCrypto::help_buffer_;
-
-StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
+void Crypto::HKDF_SHA1(const unsigned char *salt, int salt_len, const unsigned char *ikm, int ikm_len, const unsigned char *info, int info_len,
+                       unsigned char *okm, int okm_len)
 {
-  memset(&cipher_node_key_, 0, sizeof(cipher_node_key_));
-  cipher_node_key_.key_size = cipher_key->key_size;
-  cipher_node_key_.iv_size = cipher_key->iv_size;
-  memcpy(cipher_node_key_.key, cipher_key->key, CIPHER_MAX_KEY_SIZE);
-  randombytes_buf(cipher_node_key_.encode_iv, cipher_key->iv_size);
-}
+  unsigned int len;
+  unsigned char prk[SHA_DIGEST_LENGTH], md[SHA_DIGEST_LENGTH];
 
-StreamCrypto::~StreamCrypto() {}
+  HMAC_CTX *ctx = HMAC_CTX_new();
 
-unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
-{
-  if (size >= help_buffer_.size()) {
-    help_buffer_.resize(size * 1.5);
+  HMAC_Init_ex(ctx, salt, salt_len, EVP_sha1(), NULL);
+  HMAC_Update(ctx, ikm, ikm_len);
+  HMAC_Final(ctx, prk, &len);
+
+  int N = okm_len / SHA_DIGEST_LENGTH;
+  if ((okm_len % SHA_DIGEST_LENGTH) != 0) {
+    N++;
   }
-  return help_buffer_.data();
-}
 
-int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
-{
-  size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
-  size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
-  size_t data_len = evbuffer_get_length(buf);
-  size_t code_pos = 0, drain_len = padding;
+  for (int i = 1, where = 0; i <= N; i++) {
+    unsigned char c = i;
 
-  if (!en_iv_) {
-    if (padding > cipher_node_key_.iv_size) {
-      drain_len = padding - cipher_node_key_.iv_size;
-    } else {
-      drain_len = 0;
-      code_pos = cipher_node_key_.iv_size - padding;
+    HMAC_CTX_reset(ctx);
+    HMAC_Init_ex(ctx, prk, SHA_DIGEST_LENGTH, EVP_sha1(), NULL);
+    if (i > 1) {
+      HMAC_Update(ctx, md, SHA_DIGEST_LENGTH);
     }
+    HMAC_Update(ctx, info, info_len);
+    HMAC_Update(ctx, &c, 1);
+    HMAC_Final(ctx, md, &len);
+
+    memcpy(okm + where, md, (i != N) ? SHA_DIGEST_LENGTH : (okm_len - where));
+    where += SHA_DIGEST_LENGTH;
   }
 
-  size_t code_len = padding + data_len;
-  unsigned char *code = evbuffer_pullup(buf, data_len);
-  if (padding) {
-    unsigned char *cache = GetHelperBuffer(code_len);
-    memset(cache, 0, padding);
-    memcpy(cache + padding, code, data_len);
-    code = cache;
-  }
-
-  struct evbuffer_iovec v;
-  out = evbuffer_new();
-  evbuffer_reserve_space(out, code_pos + code_len, &v, 1);
-  if (cipher_ == CHACHA20) {
-    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_node_key_.encode_iv, counter, cipher_node_key_.key);
-  } else {
-    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base + code_pos, code, code_len, cipher_node_key_.encode_iv, counter, cipher_node_key_.key);
-  }
-  if (!en_iv_) {
-    en_iv_ = true;
-    memcpy((unsigned char *)v.iov_base + drain_len, cipher_node_key_.encode_iv, cipher_node_key_.iv_size);
-  }
-  en_bytes_ += data_len;
-
-  v.iov_len = code_pos + code_len;
-  evbuffer_commit_space(out, &v, 1);
-  if (drain_len > 0) {
-    evbuffer_drain(out, drain_len);
-  }
-  return CRYPTO_OK;
-}
-
-int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
-{
-  size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
-  size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
-  size_t data_len = evbuffer_get_length(buf);
-
-  unsigned char *code = evbuffer_pullup(buf, data_len);
-  if (!de_iv_) {
-    if (data_len < cipher_node_key_.iv_size) {
-      return CRYPTO_ERROR;
-    }
-
-    de_iv_ = true;
-    memcpy(cipher_node_key_.decode_iv, code, cipher_node_key_.iv_size);
-    code += cipher_node_key_.iv_size;
-    data_len -= cipher_node_key_.iv_size;
-  }
-
-  size_t code_len = padding + data_len;
-  if (padding) {
-    unsigned char *cache = GetHelperBuffer(code_len);
-    memset(cache, 0, padding);
-    memcpy(cache + padding, code, data_len);
-    code = cache;
-  }
-
-  struct evbuffer_iovec v;
-  out = evbuffer_new();
-  evbuffer_reserve_space(out, code_len, &v, 1);
-  if (cipher_ == CHACHA20) {
-    crypto_stream_chacha20_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
-  } else {
-    crypto_stream_chacha20_ietf_xor_ic((unsigned char *)v.iov_base, code, code_len, cipher_node_key_.decode_iv, counter, cipher_node_key_.key);
-  }
-  de_bytes_ += data_len;
-
-  v.iov_len = code_len;
-  evbuffer_commit_space(out, &v, 1);
-  if (padding > 0) {
-    evbuffer_drain(out, padding);
-  }
-  return CRYPTO_OK;
+  HMAC_CTX_free(ctx);
 }
 
 CryptoCreator::CryptoCreator() {}
 
 CryptoCreator::~CryptoCreator() {}
 
-Crypto *CryptoCreator::NewCrypto() { return new StreamCrypto(cipher_, &cipher_key_); };
+Crypto *CryptoCreator::NewCrypto()
+{
+  if (cipher_key_.tag_size > 0)
+    return new AeadCrypto(cipher_, &cipher_key_);
+  else
+    return new StreamCrypto(cipher_, &cipher_key_);
+};
 
 bool CryptoCreator::Init(std::string &error)
 {
@@ -189,6 +119,7 @@ CryptoCreator *CryptoCreator::NewInstance(const char *algorithm, const char *pas
 
   CryptoCreator *out = new CryptoCreator();
   out->cipher_ = info->cipher;
-  DeriveCipherKey(&out->cipher_key_, password, info->key_size, info->iv_size);
+  Crypto::DeriveCipherKey(&out->cipher_key_, password, info->key_size, info->iv_size);
+  out->cipher_key_.tag_size = info->tag_size;
   return out;
 }

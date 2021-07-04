@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sodium.h>
 #include <string.h>
 
 #include <memory>
@@ -9,20 +10,25 @@
 #include "debug.h"
 #include "network.h"
 
-#define CIPHER_MAX_IV_SIZE 16
-#define CIPHER_MAX_KEY_SIZE 32
-
 enum {
   CRYPTO_ERROR = -1,
   CRYPTO_OK,
   CRYPTO_NEED_NORE,
 };
 
+#define SODIUM_BLOCK_SIZE 64
+
+#define CIPHER_MAX_KEY_SIZE 32
+#define CIPHER_MAX_IV_SIZE 16
+#define CIPHER_MAX_TAG_SIZE 16
+
 struct CipherKey {
   unsigned int key_size;
   unsigned int iv_size;
+  unsigned int tag_size;
   unsigned char key[CIPHER_MAX_KEY_SIZE];
 };
+enum CryptoCipher { CHACHA20 = 0, CHACHA20_IETF, CHACHA20_IETF_POLY1305 };
 
 class Crypto
 {
@@ -35,38 +41,10 @@ class Crypto
 
   virtual int Encrypt(evbuffer *buf, evbuffer *&out) = 0;
   virtual int Decrypt(evbuffer *buf, evbuffer *&out) = 0;
-};
 
-class StreamCrypto : Crypto
-{
-  friend class CryptoCreator;
-
-  struct CipherNodeKey {
-    unsigned int key_size;
-    unsigned int iv_size;
-    unsigned char key[CIPHER_MAX_KEY_SIZE];
-    unsigned char encode_iv[CIPHER_MAX_IV_SIZE];
-    unsigned char decode_iv[CIPHER_MAX_IV_SIZE];
-  };
-
- protected:
-  StreamCrypto(unsigned int cipher, CipherKey *cipher_key);
-  ~StreamCrypto();
-
- public:
-  int Encrypt(evbuffer *buf, evbuffer *&out);
-  int Decrypt(evbuffer *buf, evbuffer *&out);
-
- private:
-  static unsigned char *GetHelperBuffer(size_t size);
-
-  bool en_iv_ = false;
-  size_t en_bytes_ = 0;
-  bool de_iv_ = false;
-  size_t de_bytes_ = 0;
-  unsigned int cipher_ = 0;
-  CipherNodeKey cipher_node_key_;
-  static std::vector<unsigned char> help_buffer_;
+  static void DeriveCipherKey(CipherKey *out, const char *password, unsigned int key_size, unsigned int iv_size);
+  static void HKDF_SHA1(const unsigned char *salt, int salt_len, const unsigned char *ikm, int ikm_len, const unsigned char *info, int info_len,
+                        unsigned char *okm, int okm_len);
 };
 
 class CryptoCreator
