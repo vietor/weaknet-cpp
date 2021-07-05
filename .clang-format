@@ -1,4 +1,2 @@
 BasedOnStyle: Google
-ColumnLimit: 160
-BreakBeforeBraces: Linux
-# AllowShortFunctionsOnASingleLine: None
+Standard: c++11

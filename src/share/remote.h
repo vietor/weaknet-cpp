@@ -2,16 +2,17 @@
 
 #include "crypto.h"
 
-class RemoteServer
-{
+class RemoteServer {
  public:
-  RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator, unsigned short port);
+  RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator,
+               unsigned short port);
   ~RemoteServer();
 
   bool Startup(std::string &error);
 
  private:
-  static void OnConnected(evconnlistener *listen, evutil_socket_t sock, struct sockaddr *addr, int len, void *ctx);
+  static void OnConnected(evconnlistener *listen, evutil_socket_t sock,
+                          struct sockaddr *addr, int len, void *ctx);
 
   void HandleConnected(evutil_socket_t sock);
 
@@ -22,12 +23,17 @@ class RemoteServer
   evconnlistener *listener_ = nullptr;
 };
 
-class RemoteClient
-{
-  enum RuningStep { STEP_INIT = 0, STEP_CONNECT, STEP_TRANSPORT, STEP_TERMINATE };
+class RemoteClient {
+  enum RuningStep {
+    STEP_INIT = 0,
+    STEP_CONNECT,
+    STEP_TRANSPORT,
+    STEP_TERMINATE
+  };
 
  public:
-  RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto, bufferevent *client);
+  RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto,
+               bufferevent *client);
 
   void Startup();
 

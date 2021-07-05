@@ -2,8 +2,7 @@
 
 #include "crypto.h"
 
-class AeadCrypto : Crypto
-{
+class AeadCrypto : Crypto {
   friend class CryptoCreator;
 
   struct CipherAeadKey {

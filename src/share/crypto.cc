@@ -15,18 +15,21 @@ struct CryptoCreatorInfo {
   unsigned int tag_size;
 };
 
-CryptoCreatorInfo supported_ciphers[] = {{"chacha20", CHACHA20, 32, 8, 0},
-                                         {"chacha20-ietf", CHACHA20_IETF, 32, 12, 0},
-                                         {"chacha20-ietf-poly1305", CHACHA20_IETF_POLY1305, 32, 12, 16},
-                                         {"xchacha20-ietf-poly1305", XCHACHA20_IETF_POLY1305, 32, 24, 16}};
+CryptoCreatorInfo supported_ciphers[] = {
+    {"chacha20", CHACHA20, 32, 8, 0},
+    {"chacha20-ietf", CHACHA20_IETF, 32, 12, 0},
+    {"chacha20-ietf-poly1305", CHACHA20_IETF_POLY1305, 32, 12, 16},
+    {"xchacha20-ietf-poly1305", XCHACHA20_IETF_POLY1305, 32, 24, 16}};
+const int supported_cipher_count =
+    sizeof(supported_ciphers) / sizeof(supported_ciphers[0]);
 
 Crypto::Crypto() {}
 Crypto::~Crypto() {}
 
 void Crypto::Release() { delete this; }
 
-void Crypto::HKEY_MD5(const char *password, unsigned char *key, unsigned int key_size)
-{
+void Crypto::HKEY_MD5(const char *password, unsigned char *key,
+                      unsigned int key_size) {
   MD5_CTX md;
   unsigned int i, j, addmd;
   size_t password_len = strlen(password);
@@ -47,9 +50,10 @@ void Crypto::HKEY_MD5(const char *password, unsigned char *key, unsigned int key
   }
 }
 
-void Crypto::HKDF_SHA1(const unsigned char *salt, int salt_len, const unsigned char *ikm, int ikm_len, const unsigned char *info, int info_len,
-                       unsigned char *okm, int okm_len)
-{
+void Crypto::HKDF_SHA1(const unsigned char *salt, int salt_len,
+                       const unsigned char *ikm, int ikm_len,
+                       const unsigned char *info, int info_len,
+                       unsigned char *okm, int okm_len) {
   unsigned int len;
   unsigned char prk[SHA_DIGEST_LENGTH], md[SHA_DIGEST_LENGTH];
 
@@ -87,16 +91,14 @@ CryptoCreator::CryptoCreator() {}
 
 CryptoCreator::~CryptoCreator() {}
 
-Crypto *CryptoCreator::NewCrypto()
-{
+Crypto *CryptoCreator::NewCrypto() {
   if (cipher_key_.tag_size > 0)
     return new AeadCrypto(cipher_, &cipher_key_);
   else
     return new StreamCrypto(cipher_, &cipher_key_);
 };
 
-bool CryptoCreator::Init(std::string &error)
-{
+bool CryptoCreator::Init(std::string &error) {
   if (sodium_init()) {
     error = "incredible: sodium_init error";
     return false;
@@ -104,10 +106,10 @@ bool CryptoCreator::Init(std::string &error)
   return true;
 }
 
-CryptoCreator *CryptoCreator::NewInstance(const char *algorithm, const char *password)
-{
+CryptoCreator *CryptoCreator::NewInstance(const char *algorithm,
+                                          const char *password) {
   CryptoCreatorInfo *info = nullptr;
-  for (size_t i = 0; i < sizeof(supported_ciphers) / sizeof(supported_ciphers[0]); ++i) {
+  for (size_t i = 0; i < supported_cipher_count; ++i) {
     if (strcmp(algorithm, supported_ciphers[i].name) == 0) {
       info = &supported_ciphers[i];
       break;

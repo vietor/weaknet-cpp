@@ -7,16 +7,14 @@
 
 #include <string>
 
-void dump(const char* format, ...)
-{
+void dump(const char* format, ...) {
   va_list ap;
   va_start(ap, format);
   vfprintf(stderr, format, ap);
   va_end(ap);
 }
 
-void dump_hex(const void* data, int size, const char* title)
-{
+void dump_hex(const void* data, int size, const char* title) {
   char tmp[32];
   std::string out;
 

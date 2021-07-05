@@ -2,8 +2,7 @@
 
 #include "crypto.h"
 
-class StreamCrypto : Crypto
-{
+class StreamCrypto : Crypto {
   friend class CryptoCreator;
 
   struct CipherStreamKey {

@@ -1,8 +1,10 @@
 #include "crypto_stream.h"
 
-static inline int crypto_stream_xor_ic(unsigned int cipher, unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n,
-                                       uint64_t ic, const unsigned char *k)
-{
+static inline int crypto_stream_xor_ic(unsigned int cipher, unsigned char *c,
+                                       const unsigned char *m,
+                                       unsigned long long mlen,
+                                       const unsigned char *n, uint64_t ic,
+                                       const unsigned char *k) {
   if (cipher == CHACHA20) {
     return crypto_stream_chacha20_xor_ic(c, m, mlen, n, ic, k);
   } else if (cipher == CHACHA20_IETF) {
@@ -14,8 +16,8 @@ static inline int crypto_stream_xor_ic(unsigned int cipher, unsigned char *c, co
 
 std::vector<unsigned char> StreamCrypto::help_buffer_;
 
-StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
-{
+StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key)
+    : cipher_(cipher) {
   memset(&cipher_stream_key_, 0, sizeof(cipher_stream_key_));
   cipher_stream_key_.key_size = cipher_key->key_size;
   cipher_stream_key_.iv_size = cipher_key->iv_size;
@@ -24,16 +26,14 @@ StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_
 
 StreamCrypto::~StreamCrypto() {}
 
-unsigned char *StreamCrypto::GetHelperBuffer(size_t size)
-{
+unsigned char *StreamCrypto::GetHelperBuffer(size_t size) {
   if (size >= help_buffer_.size()) {
     help_buffer_.resize(size * 1.5);
   }
   return help_buffer_.data();
 }
 
-int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
-{
+int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out) {
   size_t counter = en_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = en_bytes_ % SODIUM_BLOCK_SIZE;
   size_t data_len = evbuffer_get_length(buf);
@@ -62,12 +62,15 @@ int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
   out = evbuffer_new();
   evbuffer_reserve_space(out, code_pos + code_len, &v, 1);
 
-  crypto_stream_xor_ic(cipher_, (unsigned char *)v.iov_base + code_pos, code, code_len, cipher_stream_key_.encode_iv, counter, cipher_stream_key_.key);
+  crypto_stream_xor_ic(cipher_, (unsigned char *)v.iov_base + code_pos, code,
+                       code_len, cipher_stream_key_.encode_iv, counter,
+                       cipher_stream_key_.key);
   en_bytes_ += data_len;
 
   if (!en_init_) {
     en_init_ = true;
-    memcpy((unsigned char *)v.iov_base + drain_len, cipher_stream_key_.encode_iv, cipher_stream_key_.iv_size);
+    memcpy((unsigned char *)v.iov_base + drain_len,
+           cipher_stream_key_.encode_iv, cipher_stream_key_.iv_size);
   }
 
   v.iov_len = code_pos + code_len;
@@ -80,8 +83,7 @@ int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
   return CRYPTO_OK;
 }
 
-int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
-{
+int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out) {
   size_t counter = de_bytes_ / SODIUM_BLOCK_SIZE;
   size_t padding = de_bytes_ % SODIUM_BLOCK_SIZE;
   size_t data_len = evbuffer_get_length(buf);
@@ -112,7 +114,9 @@ int StreamCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
   out = evbuffer_new();
   evbuffer_reserve_space(out, code_len, &v, 1);
 
-  crypto_stream_xor_ic(cipher_, (unsigned char *)v.iov_base, code, code_len, cipher_stream_key_.decode_iv, counter, cipher_stream_key_.key);
+  crypto_stream_xor_ic(cipher_, (unsigned char *)v.iov_base, code, code_len,
+                       cipher_stream_key_.decode_iv, counter,
+                       cipher_stream_key_.key);
   de_bytes_ += data_len;
 
   v.iov_len = code_len;

@@ -7,32 +7,42 @@
 const unsigned char SUBKEY_INFO[] = "ss-subkey";
 const int SUBKEY_INFO_LEN = (sizeof(SUBKEY_INFO) - 1);
 
-static inline int crypto_aead_encrypt(unsigned int cipher, unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen,
-                                      const unsigned char *npub, const unsigned char *k)
-{
+static inline int crypto_aead_encrypt(unsigned int cipher, unsigned char *c,
+                                      unsigned long long *clen_p,
+                                      const unsigned char *m,
+                                      unsigned long long mlen,
+                                      const unsigned char *npub,
+                                      const unsigned char *k) {
   if (cipher == CHACHA20_IETF_POLY1305) {
-    return crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
+    return crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL,
+                                                     0, NULL, npub, k);
   } else if (cipher == XCHACHA20_IETF_POLY1305) {
-    return crypto_aead_xchacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
+    return crypto_aead_xchacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL,
+                                                      0, NULL, npub, k);
   } else {
     return -1;
   }
 }
 
-static inline int crypto_aead_decrypt(unsigned int cipher, unsigned char *m, unsigned long long *mlen_p, const unsigned char *c, unsigned long long clen,
-                                      const unsigned char *npub, const unsigned char *k)
-{
+static inline int crypto_aead_decrypt(unsigned int cipher, unsigned char *m,
+                                      unsigned long long *mlen_p,
+                                      const unsigned char *c,
+                                      unsigned long long clen,
+                                      const unsigned char *npub,
+                                      const unsigned char *k) {
   if (cipher == CHACHA20_IETF_POLY1305) {
-    return crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
+    return crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen,
+                                                     NULL, 0, npub, k);
   } else if (cipher == XCHACHA20_IETF_POLY1305) {
-    return crypto_aead_xchacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
+    return crypto_aead_xchacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen,
+                                                      NULL, 0, npub, k);
   } else {
     return -1;
   }
 }
 
-AeadCrypto::AeadCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cipher)
-{
+AeadCrypto::AeadCrypto(unsigned int cipher, CipherKey *cipher_key)
+    : cipher_(cipher) {
   memset(&cipher_aead_key_, 0, sizeof(cipher_aead_key_));
   cipher_aead_key_.key_size = cipher_key->key_size;
   cipher_aead_key_.iv_size = cipher_key->iv_size;
@@ -40,29 +50,34 @@ AeadCrypto::AeadCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cip
   memcpy(cipher_aead_key_.key, cipher_key->key, cipher_key->key_size);
 }
 
-AeadCrypto::~AeadCrypto()
-{
+AeadCrypto::~AeadCrypto() {
   if (decode_cached_) {
     evbuffer_free(decode_cached_);
   }
 }
 
-int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
-{
+int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out) {
   size_t source_pos = 0, source_len = evbuffer_get_length(buf);
   unsigned char *source_ptr = evbuffer_pullup(buf, source_len);
 
-  size_t chunk_count = source_len / CHUNK_SIZE_SPLIT, last_chunk_len = source_len % CHUNK_SIZE_SPLIT;
-  size_t target_pos = 0, target_len = (2 * cipher_aead_key_.tag_size + CHUNK_SIZE_LEN + CHUNK_SIZE_SPLIT) * chunk_count;
+  size_t chunk_count = source_len / CHUNK_SIZE_SPLIT,
+         last_chunk_len = source_len % CHUNK_SIZE_SPLIT;
+  size_t target_pos = 0, target_len = (2 * cipher_aead_key_.tag_size +
+                                       CHUNK_SIZE_LEN + CHUNK_SIZE_SPLIT) *
+                                      chunk_count;
   if (last_chunk_len > 0) {
     chunk_count += 1;
-    target_len += 2 * cipher_aead_key_.tag_size + CHUNK_SIZE_LEN + last_chunk_len;
+    target_len +=
+        2 * cipher_aead_key_.tag_size + CHUNK_SIZE_LEN + last_chunk_len;
   }
   if (!en_init_) {
     target_len += cipher_aead_key_.key_size;
     randombytes_buf(cipher_aead_key_.encode_salt, cipher_aead_key_.key_size);
-    Crypto::HKDF_SHA1(cipher_aead_key_.encode_salt, cipher_aead_key_.key_size, cipher_aead_key_.key, cipher_aead_key_.key_size, SUBKEY_INFO, SUBKEY_INFO_LEN,
-                      cipher_aead_key_.encode_subkey, cipher_aead_key_.key_size);
+    Crypto::HKDF_SHA1(cipher_aead_key_.encode_salt, cipher_aead_key_.key_size,
+                      cipher_aead_key_.key, cipher_aead_key_.key_size,
+                      SUBKEY_INFO, SUBKEY_INFO_LEN,
+                      cipher_aead_key_.encode_subkey,
+                      cipher_aead_key_.key_size);
   }
 
   evbuffer_iovec v;
@@ -71,7 +86,8 @@ int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
 
   if (!en_init_) {
     en_init_ = true;
-    memcpy((unsigned char *)v.iov_base + target_pos, cipher_aead_key_.encode_salt, cipher_aead_key_.key_size);
+    memcpy((unsigned char *)v.iov_base + target_pos,
+           cipher_aead_key_.encode_salt, cipher_aead_key_.key_size);
     target_pos += cipher_aead_key_.key_size;
   }
 
@@ -84,13 +100,17 @@ int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
 
     len = htons(chunk_len);
     encrypt_len = CHUNK_SIZE_LEN + cipher_aead_key_.tag_size;
-    crypto_aead_encrypt(cipher_, (unsigned char *)v.iov_base + target_pos, &encrypt_len, (unsigned char *)&len, CHUNK_SIZE_LEN, cipher_aead_key_.encode_iv,
+    crypto_aead_encrypt(cipher_, (unsigned char *)v.iov_base + target_pos,
+                        &encrypt_len, (unsigned char *)&len, CHUNK_SIZE_LEN,
+                        cipher_aead_key_.encode_iv,
                         cipher_aead_key_.encode_subkey);
     target_pos += encrypt_len;
     sodium_increment(cipher_aead_key_.encode_iv, cipher_aead_key_.iv_size);
 
     encrypt_len = chunk_len + cipher_aead_key_.tag_size;
-    crypto_aead_encrypt(cipher_, (unsigned char *)v.iov_base + target_pos, &encrypt_len, source_ptr + source_pos, chunk_len, cipher_aead_key_.encode_iv,
+    crypto_aead_encrypt(cipher_, (unsigned char *)v.iov_base + target_pos,
+                        &encrypt_len, source_ptr + source_pos, chunk_len,
+                        cipher_aead_key_.encode_iv,
                         cipher_aead_key_.encode_subkey);
     target_pos += encrypt_len;
     sodium_increment(cipher_aead_key_.encode_iv, cipher_aead_key_.iv_size);
@@ -105,8 +125,7 @@ int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
   return CRYPTO_OK;
 }
 
-int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
-{
+int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out) {
   if (decode_cached_) {
     evbuffer_add_buffer(decode_cached_, buf);
     evbuffer_free(buf);
@@ -125,11 +144,15 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
     }
 
     de_init_ = true;
-    memcpy(cipher_aead_key_.decode_salt, source_ptr + source_pos, cipher_aead_key_.key_size);
+    memcpy(cipher_aead_key_.decode_salt, source_ptr + source_pos,
+           cipher_aead_key_.key_size);
     source_pos += cipher_aead_key_.key_size;
 
-    Crypto::HKDF_SHA1(cipher_aead_key_.decode_salt, cipher_aead_key_.key_size, cipher_aead_key_.key, cipher_aead_key_.key_size, SUBKEY_INFO, SUBKEY_INFO_LEN,
-                      cipher_aead_key_.decode_subkey, cipher_aead_key_.key_size);
+    Crypto::HKDF_SHA1(cipher_aead_key_.decode_salt, cipher_aead_key_.key_size,
+                      cipher_aead_key_.key, cipher_aead_key_.key_size,
+                      SUBKEY_INFO, SUBKEY_INFO_LEN,
+                      cipher_aead_key_.decode_subkey,
+                      cipher_aead_key_.key_size);
   }
 
   evbuffer_iovec v;
@@ -147,8 +170,10 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
     }
 
     decrypt_len = CHUNK_SIZE_LEN;
-    err = crypto_aead_decrypt(cipher_, (unsigned char *)&len, &decrypt_len, source_ptr + source_pos, CHUNK_SIZE_LEN + cipher_aead_key_.tag_size,
-                              cipher_aead_key_.decode_iv, cipher_aead_key_.decode_subkey);
+    err = crypto_aead_decrypt(
+        cipher_, (unsigned char *)&len, &decrypt_len, source_ptr + source_pos,
+        CHUNK_SIZE_LEN + cipher_aead_key_.tag_size, cipher_aead_key_.decode_iv,
+        cipher_aead_key_.decode_subkey);
     if (err) {
       last = CRYPTO_ERROR;
       break;
@@ -165,8 +190,10 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
     evbuffer_reserve_space(out, len, &v, 1);
 
     decrypt_len = len;
-    err = crypto_aead_decrypt(cipher_, (unsigned char *)v.iov_base, &decrypt_len, source_ptr + source_pos, len + cipher_aead_key_.tag_size,
-                              cipher_aead_key_.decode_iv, cipher_aead_key_.decode_subkey);
+    err = crypto_aead_decrypt(
+        cipher_, (unsigned char *)v.iov_base, &decrypt_len,
+        source_ptr + source_pos, len + cipher_aead_key_.tag_size,
+        cipher_aead_key_.decode_iv, cipher_aead_key_.decode_subkey);
 
     v.iov_len = len;
     evbuffer_commit_space(out, &v, 1);

@@ -4,14 +4,12 @@
 
 #include "../share/remote.h"
 
-void quit(const char *message)
-{
+void quit(const char *message) {
   fprintf(stderr, "%s\n", message);
   exit(EXIT_FAILURE);
 }
 
-void usage(const char *app)
-{
+void usage(const char *app) {
   const char *name = strrchr(app, PATH_SEPARATOR);
   if (name) {
     ++name;
@@ -34,8 +32,7 @@ void usage(const char *app)
   exit(EXIT_FAILURE);
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 #ifdef SYS_WINDOWS
   WORD wVersionRequested = MAKEWORD(2, 2);
   WSADATA wsaData;
@@ -54,7 +51,8 @@ int main(int argc, char *argv[])
 
   int port = 51080;
   std::string algorithm, password;
-  while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
+  while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) !=
+         -1) {
     switch (opt) {
       case 'p':
         port = atoi(optarg);
@@ -92,7 +90,8 @@ int main(int argc, char *argv[])
     quit(error.c_str());
   }
 
-  CryptoCreator *creator = CryptoCreator::NewInstance(algorithm.c_str(), password.c_str());
+  CryptoCreator *creator =
+      CryptoCreator::NewInstance(algorithm.c_str(), password.c_str());
   if (!creator) {
     quit("invalid option: algorithm, not supported");
   }

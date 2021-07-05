@@ -2,40 +2,39 @@
 
 #define MAX_OUTPUT (512 * 1024)
 
-RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator, unsigned short port)
-    : base_(base), dnsbase_(dnsbase), creator_(creator), port_(port)
-{
-}
+RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase,
+                           CryptoCreator *creator, unsigned short port)
+    : base_(base), dnsbase_(dnsbase), creator_(creator), port_(port) {}
 
-RemoteServer::~RemoteServer()
-{
+RemoteServer::~RemoteServer() {
   if (listener_) {
     evconnlistener_free(listener_);
   }
 }
 
-bool RemoteServer::Startup(std::string &error)
-{
+bool RemoteServer::Startup(std::string &error) {
   sockaddr_in sin;
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
   sin.sin_addr.s_addr = INADDR_ANY;
   sin.sin_port = htons(port_);
-  listener_ = evconnlistener_new_bind(base_, OnConnected, this, LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE, 128, (sockaddr *)&sin, sizeof(sin));
+  listener_ = evconnlistener_new_bind(base_, OnConnected, this,
+                                      LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE,
+                                      128, (sockaddr *)&sin, sizeof(sin));
   if (!listener_) {
     error = "bad listen on port: " + std::to_string(port_);
   }
   return !!listener_;
 }
 
-void RemoteServer::OnConnected(evconnlistener *listen, evutil_socket_t sock, struct sockaddr *addr, int len, void *ctx)
-{
+void RemoteServer::OnConnected(evconnlistener *listen, evutil_socket_t sock,
+                               struct sockaddr *addr, int len, void *ctx) {
   ((RemoteServer *)ctx)->HandleConnected(sock);
 }
 
-void RemoteServer::HandleConnected(evutil_socket_t sock)
-{
-  struct bufferevent *event = bufferevent_socket_new(base_, sock, BEV_OPT_CLOSE_ON_FREE);
+void RemoteServer::HandleConnected(evutil_socket_t sock) {
+  struct bufferevent *event =
+      bufferevent_socket_new(base_, sock, BEV_OPT_CLOSE_ON_FREE);
   if (!event) {
     evutil_closesocket(sock);
     return;
@@ -44,13 +43,11 @@ void RemoteServer::HandleConnected(evutil_socket_t sock)
   (new RemoteClient(base_, dnsbase_, creator_->NewCrypto(), event))->Startup();
 }
 
-RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto, bufferevent *client)
-    : base_(base), dnsbase_(dnsbase), crypto_(crypto), client_(client)
-{
-}
+RemoteClient::RemoteClient(event_base *base, evdns_base *dnsbase,
+                           Crypto *crypto, bufferevent *client)
+    : base_(base), dnsbase_(dnsbase), crypto_(crypto), client_(client) {}
 
-RemoteClient::~RemoteClient()
-{
+RemoteClient::~RemoteClient() {
   bufferevent_free(client_);
   if (target_) {
     bufferevent_free(target_);
@@ -61,25 +58,24 @@ RemoteClient::~RemoteClient()
   crypto_->Release();
 }
 
-void RemoteClient::Startup()
-{
+void RemoteClient::Startup() {
   bufferevent_setcb(client_, OnClientRead, OnClientWrite, OnClientEvent, this);
   bufferevent_enable(client_, EV_READ | EV_WRITE);
 }
 
-void RemoteClient::Cleanup(const char *reason)
-{
+void RemoteClient::Cleanup(const char *reason) {
 #if USE_DEBUG
   if (strstr(reason, "error")) {
-    dump("cleanup: client: %d, target: %d, step: %d, %s\n", bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0, step_, reason);
+    dump("cleanup: client: %d, target: %d, step: %d, %s\n",
+         bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0,
+         step_, reason);
   }
 #endif
   step_ = STEP_TERMINATE;
   delete this;
 }
 
-void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
-{
+void RemoteClient::OnClientRead(bufferevent *bev, void *ctx) {
   RemoteClient *self = (RemoteClient *)ctx;
   evbuffer *buf = evbuffer_new();
   int ret = bufferevent_read_buffer(bev, buf);
@@ -91,18 +87,18 @@ void RemoteClient::OnClientRead(bufferevent *bev, void *ctx)
   }
 }
 
-void RemoteClient::OnClientWrite(bufferevent *bev, void *ctx) { ((RemoteClient *)ctx)->HandleClientEmpty(); }
+void RemoteClient::OnClientWrite(bufferevent *bev, void *ctx) {
+  ((RemoteClient *)ctx)->HandleClientEmpty();
+}
 
-void RemoteClient::OnClientEvent(bufferevent *bev, short what, void *ctx)
-{
+void RemoteClient::OnClientEvent(bufferevent *bev, short what, void *ctx) {
   RemoteClient *self = (RemoteClient *)ctx;
   if (what & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
     self->Cleanup("client closed");
   }
 }
 
-void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx)
-{
+void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx) {
   RemoteClient *self = (RemoteClient *)ctx;
   evbuffer *buf = evbuffer_new();
   int ret = bufferevent_read_buffer(bev, buf);
@@ -114,10 +110,11 @@ void RemoteClient::OnTargetRead(bufferevent *bev, void *ctx)
   }
 }
 
-void RemoteClient::OnTargetWrite(bufferevent *bev, void *ctx) { ((RemoteClient *)ctx)->HandleTargetEmpty(); }
+void RemoteClient::OnTargetWrite(bufferevent *bev, void *ctx) {
+  ((RemoteClient *)ctx)->HandleTargetEmpty();
+}
 
-void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx)
-{
+void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx) {
   RemoteClient *self = (RemoteClient *)ctx;
   if (what & BEV_EVENT_CONNECTED) {
     self->HandleTargetReady();
@@ -126,8 +123,7 @@ void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx)
   }
 }
 
-void RemoteClient::HandleClientRead(evbuffer *buf)
-{
+void RemoteClient::HandleClientRead(evbuffer *buf) {
   evbuffer *decoded = nullptr;
   int cret = crypto_->Decrypt(buf, decoded);
   if (cret == CRYPTO_NEED_NORE) {
@@ -139,7 +135,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     return;
   }
 
-  std::unique_ptr<evbuffer, void (*)(evbuffer *)> decoded_clear(decoded, &evbuffer_free);
+  std::unique_ptr<evbuffer, void (*)(evbuffer *)> decoded_clear(decoded,
+                                                                &evbuffer_free);
 
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
@@ -172,7 +169,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
       return;
     }
 
-    unsigned short port = ntohs(*(unsigned short *)(data + addr_pos + addr_len));
+    unsigned short port =
+        ntohs(*(unsigned short *)(data + addr_pos + addr_len));
     if (!port) {
       Cleanup("error proxy header, port");
       return;
@@ -185,13 +183,15 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
     }
 
     step_ = STEP_CONNECT;
-    bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent, this);
+    bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent,
+                      this);
     bufferevent_enable(target_, EV_READ | EV_WRITE);
 
     char *addr = (char *)data + addr_pos;
     if (type == 3) {
       addr[addr_len] = '\0';
-      bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, addr, port);
+      bufferevent_socket_connect_hostname(target_, dnsbase_, AF_UNSPEC, addr,
+                                          port);
     } else {
       sockaddr_storage sa;
 
@@ -232,16 +232,14 @@ void RemoteClient::HandleClientRead(evbuffer *buf)
   }
 }
 
-void RemoteClient::HandleClientEmpty()
-{
+void RemoteClient::HandleClientEmpty() {
   if (step_ == STEP_TRANSPORT && client_busy_) {
     client_busy_ = false;
     bufferevent_enable(target_, EV_READ);
   }
 }
 
-void RemoteClient::HandleTargetReady()
-{
+void RemoteClient::HandleTargetReady() {
   step_ = STEP_TRANSPORT;
   if (target_cached_) {
     bufferevent_write_buffer(target_, target_cached_);
@@ -250,8 +248,7 @@ void RemoteClient::HandleTargetReady()
   }
 }
 
-void RemoteClient::HandleTargetRead(evbuffer *buf)
-{
+void RemoteClient::HandleTargetRead(evbuffer *buf) {
   evbuffer *encoded = nullptr;
   int cret = crypto_->Encrypt(buf, encoded);
   if (cret != CRYPTO_OK) {
@@ -268,8 +265,7 @@ void RemoteClient::HandleTargetRead(evbuffer *buf)
   }
 }
 
-void RemoteClient::HandleTargetEmpty()
-{
+void RemoteClient::HandleTargetEmpty() {
   if (step_ == STEP_TRANSPORT && target_busy_) {
     target_busy_ = false;
     bufferevent_enable(client_, EV_READ);
