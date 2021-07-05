@@ -5,6 +5,7 @@
 #define CHUNK_SIZE_SPLIT (CHUNK_SIZE_MASK / 2 * 2)
 
 const unsigned char SUBKEY_INFO[] = "ss-subkey";
+const int SUBKEY_INFO_LEN = (sizeof(SUBKEY_INFO) - 1);
 
 static inline int crypto_aead_encrypt(unsigned int cipher, unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen,
                                       const unsigned char *npub, const unsigned char *k)
@@ -33,9 +34,6 @@ AeadCrypto::AeadCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_(cip
   cipher_aead_key_.iv_size = cipher_key->iv_size;
   cipher_aead_key_.tag_size = cipher_key->tag_size;
   memcpy(cipher_aead_key_.key, cipher_key->key, cipher_key->key_size);
-  randombytes_buf(cipher_aead_key_.encode_salt, cipher_key->key_size);
-  Crypto::HKDF_SHA1(cipher_aead_key_.encode_salt, cipher_key->key_size, cipher_aead_key_.key, cipher_key->key_size, SUBKEY_INFO, sizeof(SUBKEY_INFO),
-                    cipher_aead_key_.encode_subkey, cipher_key->key_size);
 }
 
 AeadCrypto::~AeadCrypto()
@@ -58,6 +56,9 @@ int AeadCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
   }
   if (!en_init_) {
     target_len += cipher_aead_key_.key_size;
+    randombytes_buf(cipher_aead_key_.encode_salt, cipher_aead_key_.key_size);
+    Crypto::HKDF_SHA1(cipher_aead_key_.encode_salt, cipher_aead_key_.key_size, cipher_aead_key_.key, cipher_aead_key_.key_size, SUBKEY_INFO, SUBKEY_INFO_LEN,
+                      cipher_aead_key_.encode_subkey, cipher_aead_key_.key_size);
   }
 
   evbuffer_iovec v;
@@ -121,10 +122,10 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
 
     de_init_ = true;
     memcpy(cipher_aead_key_.decode_salt, source_ptr + source_pos, cipher_aead_key_.key_size);
-    Crypto::HKDF_SHA1(cipher_aead_key_.decode_salt, cipher_aead_key_.key_size, cipher_aead_key_.key, cipher_aead_key_.key_size, SUBKEY_INFO,
-                      sizeof(SUBKEY_INFO), cipher_aead_key_.decode_subkey, cipher_aead_key_.key_size);
-
     source_pos += cipher_aead_key_.key_size;
+
+    Crypto::HKDF_SHA1(cipher_aead_key_.decode_salt, cipher_aead_key_.key_size, cipher_aead_key_.key, cipher_aead_key_.key_size, SUBKEY_INFO, SUBKEY_INFO_LEN,
+                      cipher_aead_key_.decode_subkey, cipher_aead_key_.key_size);
   }
 
   evbuffer_iovec v;
@@ -188,13 +189,16 @@ int AeadCrypto::Decrypt(evbuffer *buf, evbuffer *&out)
       out = nullptr;
     }
   } else {
+    decode_cached_ = buf;
     if (drain_len > 0) {
       evbuffer_drain(buf, drain_len);
-      decode_cached_ = buf;
     }
 
     if (evbuffer_get_length(out) > 0) {
       last = CRYPTO_OK;
+    } else {
+      evbuffer_free(out);
+      out = nullptr;
     }
   }
 

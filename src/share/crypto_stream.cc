@@ -20,7 +20,6 @@ StreamCrypto::StreamCrypto(unsigned int cipher, CipherKey *cipher_key) : cipher_
   cipher_stream_key_.key_size = cipher_key->key_size;
   cipher_stream_key_.iv_size = cipher_key->iv_size;
   memcpy(cipher_stream_key_.key, cipher_key->key, cipher_key->key_size);
-  randombytes_buf(cipher_stream_key_.encode_iv, cipher_key->iv_size);
 }
 
 StreamCrypto::~StreamCrypto() {}
@@ -47,6 +46,7 @@ int StreamCrypto::Encrypt(evbuffer *buf, evbuffer *&out)
       drain_len = 0;
       code_pos = cipher_stream_key_.iv_size - padding;
     }
+    randombytes_buf(cipher_stream_key_.encode_iv, cipher_stream_key_.iv_size);
   }
 
   size_t code_len = padding + data_len;
