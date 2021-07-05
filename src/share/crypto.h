@@ -18,9 +18,9 @@ enum {
 
 #define SODIUM_BLOCK_SIZE 64
 
-#define CIPHER_MAX_KEY_SIZE 32
-#define CIPHER_MAX_IV_SIZE 16
-#define CIPHER_MAX_TAG_SIZE 16
+#define CIPHER_MAX_KEY_SIZE 64
+#define CIPHER_MAX_IV_SIZE 32
+#define CIPHER_MAX_TAG_SIZE 32
 
 struct CipherKey {
   unsigned int key_size;
@@ -28,7 +28,7 @@ struct CipherKey {
   unsigned int tag_size;
   unsigned char key[CIPHER_MAX_KEY_SIZE];
 };
-enum CryptoCipher { CHACHA20 = 0, CHACHA20_IETF, CHACHA20_IETF_POLY1305 };
+enum CryptoCipher { CHACHA20 = 0, CHACHA20_IETF, CHACHA20_IETF_POLY1305, XCHACHA20_IETF_POLY1305 };
 
 class Crypto
 {

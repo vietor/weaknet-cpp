@@ -15,8 +15,10 @@ struct CryptoCreatorInfo {
   unsigned int tag_size;
 };
 
-CryptoCreatorInfo supported_ciphers[] = {
-    {"chacha20", CHACHA20, 32, 8, 0}, {"chacha20-ietf", CHACHA20_IETF, 32, 12, 0}, {"chacha20-ietf-poly1305", CHACHA20_IETF_POLY1305, 32, 12, 16}};
+CryptoCreatorInfo supported_ciphers[] = {{"chacha20", CHACHA20, 32, 8, 0},
+                                         {"chacha20-ietf", CHACHA20_IETF, 32, 12, 0},
+                                         {"chacha20-ietf-poly1305", CHACHA20_IETF_POLY1305, 32, 12, 16},
+                                         {"xchacha20-ietf-poly1305", XCHACHA20_IETF_POLY1305, 32, 24, 16}};
 
 Crypto::Crypto() {}
 Crypto::~Crypto() {}

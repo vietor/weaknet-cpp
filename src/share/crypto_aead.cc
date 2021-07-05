@@ -12,6 +12,8 @@ static inline int crypto_aead_encrypt(unsigned int cipher, unsigned char *c, uns
 {
   if (cipher == CHACHA20_IETF_POLY1305) {
     return crypto_aead_chacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
+  } else if (cipher == XCHACHA20_IETF_POLY1305) {
+    return crypto_aead_xchacha20poly1305_ietf_encrypt(c, clen_p, m, mlen, NULL, 0, NULL, npub, k);
   } else {
     return -1;
   }
@@ -22,6 +24,8 @@ static inline int crypto_aead_decrypt(unsigned int cipher, unsigned char *m, uns
 {
   if (cipher == CHACHA20_IETF_POLY1305) {
     return crypto_aead_chacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
+  } else if (cipher == XCHACHA20_IETF_POLY1305) {
+    return crypto_aead_xchacha20poly1305_ietf_decrypt(m, mlen_p, NULL, c, clen, NULL, 0, npub, k);
   } else {
     return -1;
   }
