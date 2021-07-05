@@ -21,5 +21,8 @@
 #include <event2/bufferevent.h>
 #include <event2/dns.h>
 #include <event2/event.h>
-#include <event2/event_struct.h>
 #include <event2/listener.h>
+
+inline bool bufferevent_output_busy(bufferevent* target) {
+  return evbuffer_get_length(bufferevent_get_output(target)) >= 512 * 1024;
+}

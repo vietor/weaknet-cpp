@@ -1,7 +1,5 @@
 #include "remote.h"
 
-#define MAX_OUTPUT (512 * 1024)
-
 RemoteServer::RemoteServer(event_base *base, evdns_base *dnsbase,
                            CryptoCreator *creator, unsigned short port)
     : base_(base), dnsbase_(dnsbase), creator_(creator), port_(port) {}
@@ -28,12 +26,12 @@ bool RemoteServer::Startup(std::string &error) {
 }
 
 void RemoteServer::OnConnected(evconnlistener *listen, evutil_socket_t sock,
-                               struct sockaddr *addr, int len, void *ctx) {
+                               sockaddr *addr, int len, void *ctx) {
   ((RemoteServer *)ctx)->HandleConnected(sock);
 }
 
 void RemoteServer::HandleConnected(evutil_socket_t sock) {
-  struct bufferevent *event =
+  bufferevent *event =
       bufferevent_socket_new(base_, sock, BEV_OPT_CLOSE_ON_FREE);
   if (!event) {
     evutil_closesocket(sock);
@@ -225,7 +223,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf) {
   } else {
     bufferevent_write_buffer(target_, decoded);
 
-    if (evbuffer_get_length(bufferevent_get_output(target_)) > MAX_OUTPUT) {
+    if (bufferevent_output_busy(target_)) {
       target_busy_ = true;
       bufferevent_disable(client_, EV_READ);
     }
@@ -259,7 +257,7 @@ void RemoteClient::HandleTargetRead(evbuffer *buf) {
   bufferevent_write_buffer(client_, encoded);
   evbuffer_free(encoded);
 
-  if (evbuffer_get_length(bufferevent_get_output(client_)) > MAX_OUTPUT) {
+  if (bufferevent_output_busy(client_)) {
     client_busy_ = true;
     bufferevent_disable(target_, EV_READ);
   }

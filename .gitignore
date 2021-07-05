@@ -5,7 +5,7 @@ GRTAGS
 
 build/
 build.sh
-aimoscreen*
+weaknet*
 Makefile
 CMakeLists.txt.user
 CMakeCache.txt

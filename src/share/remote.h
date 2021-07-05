@@ -12,7 +12,7 @@ class RemoteServer {
 
  private:
   static void OnConnected(evconnlistener *listen, evutil_socket_t sock,
-                          struct sockaddr *addr, int len, void *ctx);
+                          sockaddr *addr, int len, void *ctx);
 
   void HandleConnected(evutil_socket_t sock);
 
