@@ -133,8 +133,8 @@ void RemoteClient::HandleClientRead(evbuffer *buf) {
     return;
   }
 
-  std::unique_ptr<evbuffer, void (*)(evbuffer *)> decoded_clear(decoded,
-                                                                &evbuffer_free);
+  std::unique_ptr<evbuffer, decltype(&evbuffer_free)> decoded_clear(
+      decoded, &evbuffer_free);
 
   if (step_ == STEP_INIT) {
     int data_len = evbuffer_get_length(decoded);
