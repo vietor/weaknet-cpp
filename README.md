@@ -1,6 +1,6 @@
 weaknet-cpp
 ==============================
-Replace the [weaknet-python](https://github.com/vietor/weaknet-python) with langage c/c++
+A simple and enough **Shadowsocks** Implementation.
 
 # History
 
@@ -28,7 +28,7 @@ Options:
     chacha20-ietf-poly1305,
     xchacha20-ietf-poly1305
  -s or --password <password>
- - or --help
+ -h or --help
 ```
 
 ## weaknet-client
