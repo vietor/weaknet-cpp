@@ -2,17 +2,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "version.h"
 #include "../share/local.h"
 
 int main(int argc, char *argv[]) {
-  network_init();
-
   int opt;
   const char *short_options = "p:m:s:R:h";
   struct option long_options[] = {{"port", required_argument, NULL, 'p'},
                                   {"algorithm", required_argument, NULL, 'm'},
                                   {"password", required_argument, NULL, 's'},
                                   {"remote-addr", required_argument, NULL, 'R'},
+                                  {"version", no_argument, NULL, 'v'},
                                   {"help", no_argument, NULL, 'h'},
                                   {0, 0, 0, 0}};
 
@@ -37,6 +37,10 @@ int main(int argc, char *argv[]) {
         remote_addr = optarg;
         break;
 
+      case 'v':
+        quit("weaknet-client version " PROJECT_VERSION);
+        break;
+
       default:
         usage(argv[0],
               "Usage: %s <options>\n"
@@ -48,6 +52,7 @@ int main(int argc, char *argv[]) {
               "    xchacha20-ietf-poly1305\n"
               " -s or --password <password>\n"
               " -R or --remote-addr <ip:port>\n"
+              " -v or --version\n"
               " -h or --help\n"
               "\n");
         break;
@@ -69,6 +74,8 @@ int main(int argc, char *argv[]) {
   if (remote_addr.empty()) {
     quit("invalid option: remote addr");
   }
+
+  network_init();
 
   sockaddr_storage target_addr;
   int addr_len = sizeof(target_addr);

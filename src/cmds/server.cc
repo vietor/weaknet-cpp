@@ -2,16 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "version.h"
 #include "../share/remote.h"
 
 int main(int argc, char *argv[]) {
-  network_init();
-
   int opt;
   const char *short_options = "p:m:s:h";
   struct option long_options[] = {{"port", required_argument, NULL, 'p'},
                                   {"algorithm", required_argument, NULL, 'm'},
                                   {"password", required_argument, NULL, 's'},
+                                  {"version", no_argument, NULL, 'v'},
                                   {"help", no_argument, NULL, 'h'},
                                   {0, 0, 0, 0}};
 
@@ -32,6 +32,10 @@ int main(int argc, char *argv[]) {
         password = optarg;
         break;
 
+      case 'v':
+        quit("weaknet-server version " PROJECT_VERSION);
+        break;
+
       default:
         usage(argv[0],
               "Usage: %s <options>\n"
@@ -42,6 +46,7 @@ int main(int argc, char *argv[]) {
               "    chacha20-ietf-poly1305,\n"
               "    xchacha20-ietf-poly1305\n"
               " -s or --password <password>\n"
+              " -v or --version\n"
               " -h or --help\n"
               "\n");
         break;
@@ -59,6 +64,8 @@ int main(int argc, char *argv[]) {
   if (password.empty()) {
     quit("invalid option: password");
   }
+
+  network_init();
 
   std::string error;
 

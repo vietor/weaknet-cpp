@@ -28,6 +28,7 @@ Options:
     chacha20-ietf-poly1305,
     xchacha20-ietf-poly1305
  -s or --password <password>
+ -v or --version
  -h or --help
 ```
 
@@ -43,5 +44,6 @@ Options:
     xchacha20-ietf-poly1305
  -s or --password <password>
  -R or --remote-addr <ip:port>
+ -v or --version
  -h or --help
 ```
