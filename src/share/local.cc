@@ -86,6 +86,20 @@ void LocalClient::Cleanup(const char *reason) {
   delete this;
 }
 
+void LocalClient::ConnectTarget() {
+  target_ = bufferevent_socket_new(base_, -1, BEV_OPT_CLOSE_ON_FREE);
+  if (!target_) {
+    Cleanup("incredible: bufferevent_socket_new");
+    return;
+  }
+
+  step_ = STEP_CONNECT;
+  bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent, this);
+  bufferevent_enable(target_, EV_READ | EV_WRITE);
+  bufferevent_socket_connect(target_, (sockaddr *)remote_addr_,
+                             sizeof(*remote_addr_));
+}
+
 void LocalClient::OnClientRead(bufferevent *bev, void *ctx) {
   LocalClient *self = (LocalClient *)ctx;
   evbuffer *buf = evbuffer_new();
@@ -198,18 +212,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       evbuffer_add(target_cached_, data + begin, addr_len);
       evbuffer_add(target_cached_, block2, sizeof(block2));
 
-      target_ = bufferevent_socket_new(base_, -1, BEV_OPT_CLOSE_ON_FREE);
-      if (!target_) {
-        Cleanup("incredible: bufferevent_socket_new");
-        return;
-      }
-
-      step_ = STEP_CONNECT;
-      bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent,
-                        this);
-      bufferevent_enable(target_, EV_READ | EV_WRITE);
-      bufferevent_socket_connect(target_, (sockaddr *)remote_addr_,
-                                 sizeof(*remote_addr_));
+      ConnectTarget();
     }
   } else if (step_ == STEP_WAITHDR) {
     if (data_len < 7 || data[0] != 0x05) {
@@ -244,19 +247,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
     target_cached_ = evbuffer_new();
     evbuffer_add(target_cached_, data + 3, data_len - 3);
 
-    target_ = bufferevent_socket_new(base_, -1, BEV_OPT_CLOSE_ON_FREE);
-    if (!target_) {
-      Cleanup("incredible: bufferevent_socket_new");
-      return;
-    }
-
-    step_ = STEP_CONNECT;
-    bufferevent_setcb(target_, OnTargetRead, OnTargetWrite, OnTargetEvent,
-                      this);
-    bufferevent_enable(target_, EV_READ | EV_WRITE);
-    bufferevent_socket_connect(target_, (sockaddr *)remote_addr_,
-                               sizeof(*remote_addr_));
-
+    ConnectTarget();
   } else if (step_ == STEP_CONNECT) {
     evbuffer_add_buffer(target_cached_, buf);
   } else {

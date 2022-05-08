@@ -49,6 +49,8 @@ class LocalClient {
   ~LocalClient();
   void Cleanup(const char *reason);
 
+  void ConnectTarget();
+
   static void OnClientRead(bufferevent *bev, void *ctx);
   static void OnClientWrite(bufferevent *bev, void *ctx);
   static void OnClientEvent(bufferevent *bev, short what, void *ctx);
