@@ -170,15 +170,15 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       evbuffer_add(bufferevent_get_output(client_), socks5_resp,
                    sizeof(socks5_resp));
     } else {
-      if (data_len < 21 || strncmp((char *)data, "CONNECT ", 8) ||
-          strncmp((char *)data + data_len - 4, "\r\n\r\n", 4)) {
-        Cleanup("error proxy header, unknow");
+      if (data_len < 21 || memcmp(data, "CONNECT ", 8) ||
+          memcmp(data + data_len - 4, "\r\n\r\n", 4)) {
+        Cleanup("error proxy header, block");
         return;
       }
 
       int begin = 8, end = begin + 1;
       while (end < data_len && data[end] != ' ') ++end;
-      if (end + 10 > data_len || strncmp((char *)data + end, " HTTP/1.", 8)) {
+      if (end + 10 > data_len || memcmp(data + end, " HTTP/1.", 8)) {
         Cleanup("error http header, format");
         return;
       }
@@ -290,8 +290,10 @@ void LocalClient::HandleTargetReady() {
     evbuffer_add(bufferevent_get_output(client_), socks5_resp,
                  sizeof(socks5_resp));
   } else {
-    evbuffer_add_printf(bufferevent_get_output(client_),
-                        "HTTP/1.1 200 Connection Established\r\n\r\n");
+    const static char http_resp[] =
+        "HTTP/1.1 200 Connection Established\r\n\r\n";
+    evbuffer_add(bufferevent_get_output(client_), http_resp,
+                 sizeof(http_resp) - 1);
   }
 }
 
