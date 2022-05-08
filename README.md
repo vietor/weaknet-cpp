@@ -15,6 +15,14 @@ So, i need upgrade the server for my **shadowsocks** cliets. I am unhappy.
   
 * The library **libevnet** is cute, so use c/c++
 
+# Build
+
+Depends on **libevent** **openssl** **sodium**.
+
+```
+cmake -DCMAKE_BUILD_TYPE=Release .
+```
+
 # Usage
 
 ## weaknet-server
