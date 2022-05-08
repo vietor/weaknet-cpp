@@ -24,7 +24,7 @@ Usage: weaknet-server <options>
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
-    chcha20, chch20-ietf,
+    chacha20, chacha20-ietf,
     chacha20-ietf-poly1305,
     xchacha20-ietf-poly1305
  -s or --password <password>
@@ -38,7 +38,7 @@ Usage: weaknet-client <options>
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
-    chcha20, chch20-ietf,
+    chacha20, chacha20-ietf,
     chacha20-ietf-poly1305,
     xchacha20-ietf-poly1305
  -s or --password <password>

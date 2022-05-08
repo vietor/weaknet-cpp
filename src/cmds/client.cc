@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
               "Options:\n"
               " -p or --port <port>, range 1-65535\n"
               " -m or --algorithm <algorithm>, support list:\n"
-              "    chcha20, chch20-ietf,\n"
+              "    chacha20, chacha20-ietf,\n"
               "    chacha20-ietf-poly1305,\n"
               "    xchacha20-ietf-poly1305\n"
               " -s or --password <password>\n"
