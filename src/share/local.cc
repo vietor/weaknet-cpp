@@ -164,7 +164,6 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       }
 
       step_ = STEP_WAITHDR;
-      protocol_ = PROTOCOL_SOCKS5;
 
       const static char socks5_resp[] = {0x05, 0x00};
       evbuffer_add(bufferevent_get_output(client_), socks5_resp,
@@ -281,30 +280,15 @@ void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
     evbuffer_add(target_cached_, data + 4, 4);
     evbuffer_add(target_cached_, data + 2, 2);
   } else {
-    int sep = 7;
-    bool found = false;
-    while (sep < data_len) {
-      if (data[sep] == 0) {
-        found = true;
-        break;
-      }
-      ++sep;
-    }
-    if (!found) {
+    unsigned char *ptr = (unsigned char *)memchr(data + 7, 0, data_len - 7);
+    if (!ptr) {
       Cleanup("error socks4 userid");
       return;
     }
 
-    found = false;
-    int domain = ++sep;
-    while (sep < data_len) {
-      if (data[sep] == 0) {
-        found = true;
-        break;
-      }
-      ++sep;
-    }
-    if (!found) {
+    int domain = (ptr - data) + 1;
+    ptr = (unsigned char *)memchr(data + domain, 0, data_len - domain);
+    if (!ptr) {
       Cleanup("error socks4a domain");
       return;
     }
@@ -355,6 +339,7 @@ void LocalClient::ProcessProtocolSOCKS5(unsigned char *data, int data_len) {
     return;
   }
 
+  protocol_ = PROTOCOL_SOCKS5;
   target_cached_ = evbuffer_new();
   evbuffer_add(target_cached_, data + 3, data_len - 3);
 
@@ -386,13 +371,12 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
     return;
   }
 
-  protocol_ = PROTOCOL_CONNECT;
-
   unsigned char block1[2], block2[2];
   block1[0] = 0x03;
   block1[1] = (unsigned char)addr_len;
   *((unsigned short *)block2) = htons(port);
 
+  protocol_ = PROTOCOL_CONNECT;
   target_cached_ = evbuffer_new();
   evbuffer_add(target_cached_, block1, sizeof(block1));
   evbuffer_add(target_cached_, data + begin, addr_len);
