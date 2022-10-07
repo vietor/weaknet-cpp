@@ -169,82 +169,16 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       const static char socks5_resp[] = {0x05, 0x00};
       evbuffer_add(bufferevent_get_output(client_), socks5_resp,
                    sizeof(socks5_resp));
+    } else if (version == 4) {
+      ProcessProtocolSOCKS4(data, data_len);
     } else if (data_len > 25 && memcmp(data, "CONNECT ", 8) == 0 &&
                memcmp(data + data_len - 4, "\r\n\r\n", 4) == 0) {
-      int begin = 8, end = begin + 1;
-      while (end < data_len && data[end] != ' ') ++end;
-      if (end + 10 > data_len || memcmp(data + end, " HTTP/1.", 8)) {
-        Cleanup("error http header, format");
-        return;
-      }
-
-      int sep = end;
-      while (sep > begin && data[sep] != ':') --sep;
-      if (sep <= begin || sep == end - 1) {
-        Cleanup("error http header, address");
-        return;
-      }
-
-      data[end] = 0;
-      data[sep++] = 0;
-
-      int addr_len = strlen((char *)data + begin);
-      int port = atoi((char *)data + sep);
-      if (addr_len > 127 || port < 1 || port > 65535) {
-        Cleanup("error http header, address");
-        return;
-      }
-
-      protocol_ = PROTOCOL_HTTP;
-
-      unsigned char block1[2], block2[2];
-      block1[0] = 0x03;
-      block1[1] = (unsigned char)addr_len;
-      *((unsigned short *)block2) = htons(port);
-
-      target_cached_ = evbuffer_new();
-      evbuffer_add(target_cached_, block1, sizeof(block1));
-      evbuffer_add(target_cached_, data + begin, addr_len);
-      evbuffer_add(target_cached_, block2, sizeof(block2));
-
-      ConnectTarget();
+      ProcessProtocolCONNECT(data, data_len);
     } else {
       Cleanup("error proxy header, block");
     }
   } else if (step_ == STEP_WAITHDR) {
-    if (data_len < 7 || data[0] != 0x05) {
-      Cleanup("error socks5 header, size");
-      return;
-    }
-
-    if (data[1] != 0x01) {
-      Cleanup("error socks5 command");
-      return;
-    }
-
-    int atyp = data[3], rear = -1;
-    switch (atyp) {
-      case 0x01:
-        rear = 10;
-        break;
-      case 0x03:
-        rear = 7 + data[4];
-        break;
-      case 0x04:
-        rear = 22;
-        break;
-      default:
-        break;
-    }
-    if (rear < 1 || rear > data_len) {
-      Cleanup("error socks5 address");
-      return;
-    }
-
-    target_cached_ = evbuffer_new();
-    evbuffer_add(target_cached_, data + 3, data_len - 3);
-
-    ConnectTarget();
+    ProcessProtocolSOCKS5(data, data_len);
   } else if (step_ == STEP_CONNECT) {
     evbuffer_add_buffer(target_cached_, buf);
   } else {
@@ -281,12 +215,17 @@ void LocalClient::HandleTargetReady() {
   bufferevent_write_buffer(target_, encoded);
   evbuffer_free(encoded);
 
-  if (protocol_ == PROTOCOL_SOCKS5) {
+  if (protocol_ == PROTOCOL_SOCKS4) {
+    const static char socks4_resp[] = {0x00, 0x5A, 0x00, 0x00,
+                                       0x00, 0x00, 0x10, 0x10};
+    evbuffer_add(bufferevent_get_output(client_), socks4_resp,
+                 sizeof(socks4_resp));
+  } else if (protocol_ == PROTOCOL_SOCKS5) {
     const static char socks5_resp[] = {0x05, 0x00, 0x00, 0x01, 0x00,
                                        0x00, 0x00, 0x00, 0x10, 0x10};
     evbuffer_add(bufferevent_get_output(client_), socks5_resp,
                  sizeof(socks5_resp));
-  } else {
+  } else if (protocol_ == PROTOCOL_CONNECT) {
     const static char http_resp[] =
         "HTTP/1.1 200 Connection Established\r\n\r\n";
     evbuffer_add(bufferevent_get_output(client_), http_resp,
@@ -319,4 +258,145 @@ void LocalClient::HandleTargetEmpty() {
     target_busy_ = false;
     bufferevent_enable(client_, EV_READ);
   }
+}
+
+void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
+  if (data_len < 9 || data[data_len - 1] != 0x00) {
+    Cleanup("error socks4 header, size");
+    return;
+  }
+
+  if (data[1] != 0x01) {
+    Cleanup("error socks4 command");
+    return;
+  }
+
+  protocol_ = PROTOCOL_SOCKS4;
+  target_cached_ = evbuffer_new();
+
+  unsigned char block[2];
+  if (data[4] != 0 || data[5] != 0 || data[6] != 0) {
+    block[0] = 0x01;
+    evbuffer_add(target_cached_, block, 1);
+    evbuffer_add(target_cached_, data + 4, 4);
+    evbuffer_add(target_cached_, data + 2, 2);
+  } else {
+    int sep = 7;
+    bool found = false;
+    while (sep < data_len) {
+      if (data[sep] == 0) {
+        found = true;
+        break;
+      }
+      ++sep;
+    }
+    if (!found) {
+      Cleanup("error socks4 userid");
+      return;
+    }
+
+    found = false;
+    int domain = ++sep;
+    while (sep < data_len) {
+      if (data[sep] == 0) {
+        found = true;
+        break;
+      }
+      ++sep;
+    }
+    if (!found) {
+      Cleanup("error socks4a domain");
+      return;
+    }
+
+    int addr_len = strlen((char *)data + domain);
+    if (addr_len > 255) {
+      Cleanup("error socks4a domain, size");
+      return;
+    }
+
+    block[0] = 0x03;
+    block[1] = (unsigned char)addr_len;
+    evbuffer_add(target_cached_, block, sizeof(block));
+    evbuffer_add(target_cached_, data + domain, addr_len);
+    evbuffer_add(target_cached_, data + 2, 2);
+  }
+
+  ConnectTarget();
+}
+
+void LocalClient::ProcessProtocolSOCKS5(unsigned char *data, int data_len) {
+  if (data_len < 7 || data[0] != 0x05) {
+    Cleanup("error socks5 header, size");
+    return;
+  }
+
+  if (data[1] != 0x01) {
+    Cleanup("error socks5 command");
+    return;
+  }
+
+  int atyp = data[3], rear = -1;
+  switch (atyp) {
+    case 0x01:
+      rear = 10;
+      break;
+    case 0x03:
+      rear = 7 + data[4];
+      break;
+    case 0x04:
+      rear = 22;
+      break;
+    default:
+      break;
+  }
+  if (rear < 1 || rear > data_len) {
+    Cleanup("error socks5 address");
+    return;
+  }
+
+  target_cached_ = evbuffer_new();
+  evbuffer_add(target_cached_, data + 3, data_len - 3);
+
+  ConnectTarget();
+}
+
+void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
+  int begin = 8, end = begin + 1;
+  while (end < data_len && data[end] != ' ') ++end;
+  if (end + 10 > data_len || memcmp(data + end, " HTTP/1.", 8)) {
+    Cleanup("error connect header, format");
+    return;
+  }
+
+  int sep = end;
+  while (sep > begin && data[sep] != ':') --sep;
+  if (sep <= begin || sep == end - 1) {
+    Cleanup("error connect header, address");
+    return;
+  }
+
+  data[end] = 0;
+  data[sep++] = 0;
+
+  int addr_len = strlen((char *)data + begin);
+  int port = atoi((char *)data + sep);
+  if (addr_len > 255 || port < 1 || port > 65535) {
+    Cleanup("error connect header, address");
+    return;
+  }
+
+  protocol_ = PROTOCOL_CONNECT;
+
+  unsigned char block1[2], block2[2];
+  block1[0] = 0x03;
+  block1[1] = (unsigned char)addr_len;
+  *((unsigned short *)block2) = htons(port);
+
+  target_cached_ = evbuffer_new();
+  evbuffer_add(target_cached_, block1, sizeof(block1));
+  evbuffer_add(target_cached_, data + begin, addr_len);
+  evbuffer_add(target_cached_, block2, sizeof(block2));
+
+  ConnectTarget();
 }
