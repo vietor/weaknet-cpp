@@ -38,6 +38,7 @@ class LocalClient {
     PROTOCOL_SOCKS4,
     PROTOCOL_SOCKS5,
     PROTOCOL_CONNECT,
+    PROTOCOL_PROXY
   };
 
  public:
@@ -68,6 +69,7 @@ class LocalClient {
   void ProcessProtocolSOCKS4(unsigned char *data, int data_len);
   void ProcessProtocolSOCKS5(unsigned char *data, int data_len);
   void ProcessProtocolCONNECT(unsigned char *data, int data_len);
+  void ProcessProtocolPROXY(unsigned char *data, int data_len);
 
   event_base *base_;
   evdns_base *dnsbase_;

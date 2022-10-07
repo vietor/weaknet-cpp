@@ -1,7 +1,5 @@
 #include "local.h"
 
-#include <event2/buffer.h>
-
 LocalServer::LocalServer(event_base *base, evdns_base *dnsbase,
                          CryptoCreator *creator, unsigned short port,
                          const sockaddr_storage *remote_addr)
@@ -173,6 +171,9 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
     } else if (data_len > 25 && memcmp(data, "CONNECT ", 8) == 0 &&
                memcmp(data + data_len - 4, "\r\n\r\n", 4) == 0) {
       ProcessProtocolCONNECT(data, data_len);
+    } else if (data_len > 25 && isupper(data[0]) && isupper(data[1]) &&
+               isupper(data[2])) {
+      ProcessProtocolPROXY(data, data_len);
     } else {
       Cleanup("error proxy header, block");
     }
@@ -293,16 +294,16 @@ void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
       return;
     }
 
-    int addr_len = strlen((char *)data + domain);
-    if (addr_len > 255) {
+    int domain_len = strlen((char *)data + domain);
+    if (domain_len > 255) {
       Cleanup("error socks4a domain, size");
       return;
     }
 
     block[0] = 0x03;
-    block[1] = (unsigned char)addr_len;
+    block[1] = (unsigned char)domain_len;
     evbuffer_add(target_cached_, block, sizeof(block));
-    evbuffer_add(target_cached_, data + domain, addr_len);
+    evbuffer_add(target_cached_, data + domain, domain_len);
     evbuffer_add(target_cached_, data + 2, 2);
   }
 
@@ -364,23 +365,91 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
   data[end] = 0;
   data[sep++] = 0;
 
-  int addr_len = strlen((char *)data + begin);
   int port = atoi((char *)data + sep);
-  if (addr_len > 255 || port < 1 || port > 65535) {
+  int domain_len = strlen((char *)data + begin);
+  if (domain_len > 255 || port < 1 || port > 65535) {
     Cleanup("error connect header, address");
     return;
   }
 
   unsigned char block1[2], block2[2];
   block1[0] = 0x03;
-  block1[1] = (unsigned char)addr_len;
+  block1[1] = (unsigned char)domain_len;
   *((unsigned short *)block2) = htons(port);
 
   protocol_ = PROTOCOL_CONNECT;
   target_cached_ = evbuffer_new();
   evbuffer_add(target_cached_, block1, sizeof(block1));
-  evbuffer_add(target_cached_, data + begin, addr_len);
+  evbuffer_add(target_cached_, data + begin, domain_len);
   evbuffer_add(target_cached_, block2, sizeof(block2));
+
+  ConnectTarget();
+}
+
+void LocalClient::ProcessProtocolPROXY(unsigned char *data, int data_len) {
+  int sep = 0, http_flag = 0, url_start = 0, address_start = 0, path_start = 0;
+  unsigned char *ptr = (unsigned char *)memchr(data, ' ', data_len);
+  if (ptr) {
+    url_start = (ptr - data) + 1;
+    if (memcmp(data + url_start, "http", 4) == 0 && data_len - url_start > 25) {
+      http_flag = 1;
+      sep = url_start + 4;
+      if (data[url_start + 5] == 's') {
+        ++sep;
+        http_flag = 2;
+      }
+    }
+    if (http_flag) {
+      if (memcmp(data + sep, "://", 3)) {
+        http_flag = 0;
+      } else {
+        address_start = sep + 3;
+      }
+    }
+    if (http_flag) {
+      ptr = (unsigned char *)memchr(data + address_start, '/',
+                                    data_len - address_start);
+      if (!ptr) {
+        http_flag = 0;
+      } else {
+        path_start = ptr - data;
+        if (path_start - address_start < 3) {
+          http_flag = 0;
+        }
+      }
+    }
+  }
+
+  if (!http_flag) {
+    Cleanup("error proxy header, protocol");
+    return;
+  }
+
+  int port = http_flag == 1 ? 80 : 443;
+  int domain_len = path_start - address_start;
+  ptr = (unsigned char *)memchr(data + address_start, ':',
+                                path_start - address_start);
+  if (ptr) {
+    *ptr = 0;
+    data[path_start] = 0;
+    port = atoi((char *)ptr + 1);
+    data[path_start] = '/';
+
+    domain_len = ptr - data - address_start;
+  }
+
+  unsigned char block1[2], block2[2];
+  block1[0] = 0x03;
+  block1[1] = (unsigned char)domain_len;
+  *((unsigned short *)block2) = htons(port);
+
+  protocol_ = PROTOCOL_PROXY;
+  target_cached_ = evbuffer_new();
+  evbuffer_add(target_cached_, block1, sizeof(block1));
+  evbuffer_add(target_cached_, data + address_start, domain_len);
+  evbuffer_add(target_cached_, block2, sizeof(block2));
+  evbuffer_add(target_cached_, data, url_start);
+  evbuffer_add(target_cached_, data + path_start, data_len - path_start);
 
   ConnectTarget();
 }
