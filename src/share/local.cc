@@ -169,13 +169,8 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       const static char socks5_resp[] = {0x05, 0x00};
       evbuffer_add(bufferevent_get_output(client_), socks5_resp,
                    sizeof(socks5_resp));
-    } else {
-      if (data_len < 21 || memcmp(data, "CONNECT ", 8) ||
-          memcmp(data + data_len - 4, "\r\n\r\n", 4)) {
-        Cleanup("error proxy header, block");
-        return;
-      }
-
+    } else if (data_len > 25 && memcmp(data, "CONNECT ", 8) == 0 &&
+               memcmp(data + data_len - 4, "\r\n\r\n", 4) == 0) {
       int begin = 8, end = begin + 1;
       while (end < data_len && data[end] != ' ') ++end;
       if (end + 10 > data_len || memcmp(data + end, " HTTP/1.", 8)) {
@@ -213,6 +208,8 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       evbuffer_add(target_cached_, block2, sizeof(block2));
 
       ConnectTarget();
+    } else {
+      Cleanup("error proxy header, block");
     }
   } else if (step_ == STEP_WAITHDR) {
     if (data_len < 7 || data[0] != 0x05) {
