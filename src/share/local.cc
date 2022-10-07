@@ -348,25 +348,27 @@ void LocalClient::ProcessProtocolSOCKS5(unsigned char *data, int data_len) {
 }
 
 void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
-  int begin = 8, end = begin + 1;
-  while (end < data_len && data[end] != ' ') ++end;
-  if (end + 10 > data_len || memcmp(data + end, " HTTP/1.", 8)) {
+  const int address_start = 8;
+  unsigned char *ptr = (unsigned char *)memchr(data + address_start, ' ',
+                                               data_len - address_start);
+  if (!ptr || (ptr - data + 10 > data_len) || memcmp(ptr, " HTTP/1.", 8)) {
     Cleanup("error connect header, format");
     return;
   }
 
-  int sep = end;
-  while (sep > begin && data[sep] != ':') --sep;
-  if (sep <= begin || sep == end - 1) {
+  *ptr = 0;
+
+  ptr = (unsigned char *)memchr(data + address_start, ':',
+                                ptr - data - address_start);
+  if (!ptr || ptr == data || ptr[1] == ' ') {
     Cleanup("error connect header, address");
     return;
   }
 
-  data[end] = 0;
-  data[sep++] = 0;
+  *ptr = 0;
 
-  int port = atoi((char *)data + sep);
-  int domain_len = strlen((char *)data + begin);
+  int port = atoi((char *)ptr + 1);
+  int domain_len = strlen((char *)data + address_start);
   if (domain_len > 255 || port < 1 || port > 65535) {
     Cleanup("error connect header, address");
     return;
@@ -380,17 +382,19 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
   protocol_ = PROTOCOL_CONNECT;
   target_cached_ = evbuffer_new();
   evbuffer_add(target_cached_, block1, sizeof(block1));
-  evbuffer_add(target_cached_, data + begin, domain_len);
+  evbuffer_add(target_cached_, data + address_start, domain_len);
   evbuffer_add(target_cached_, block2, sizeof(block2));
 
   ConnectTarget();
 }
 
 void LocalClient::ProcessProtocolPROXY(unsigned char *data, int data_len) {
-  int sep = 0, http_flag = 0, url_start = 0, address_start = 0, path_start = 0;
+  int http_flag = 0, url_start = 0, address_start = 0, path_start = 0;
   unsigned char *ptr = (unsigned char *)memchr(data, ' ', data_len);
   if (ptr) {
     url_start = (ptr - data) + 1;
+
+    int sep = 0;
     if (memcmp(data + url_start, "http", 4) == 0 && data_len - url_start > 25) {
       http_flag = 1;
       sep = url_start + 4;
