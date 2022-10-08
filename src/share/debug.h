@@ -4,8 +4,8 @@
 
 #define USE_DEBUG 0
 
-#define dump()
-#define dump_hex()
+#define dump(...)
+#define dump_hex(...)
 
 #else
 
