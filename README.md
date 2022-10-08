@@ -6,7 +6,7 @@ A simple and enough **Shadowsocks** Implementation.
 
 I was create a small **shadowsocks** server [weaknet-python](https://github.com/vietor/weaknet-python) at 2015.   
 I was always used it with stream crypto algorithm **chacha20-ietf**. I found that the newest windows client was drop all stream crypto algorithm when i was buy a new Windows laptop at 2021.   
-So, i need upgrade the server for my **shadowsocks** cliets. I am unhappy.
+So, i need upgrade the server for my **shadowsocks** clients. I am unhappy.
 
 # Why
 
@@ -41,6 +41,8 @@ Options:
 ```
 
 ## weaknet-client
+
+Support *socks4* *socks4a* *socks5* *http-connect* *http-proxy* protocol.
 
 ```
 Usage: weaknet-client <options>
