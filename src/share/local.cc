@@ -119,7 +119,7 @@ void LocalClient::OnClientWrite(bufferevent *bev, void *ctx) {
 void LocalClient::OnClientEvent(bufferevent *bev, short what, void *ctx) {
   LocalClient *self = (LocalClient *)ctx;
   if (what & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
-    self->Cleanup("client closed");
+    self->HandleClientClose();
   }
 }
 
@@ -144,12 +144,14 @@ void LocalClient::OnTargetEvent(bufferevent *bev, short what, void *ctx) {
   if (what & BEV_EVENT_CONNECTED) {
     self->HandleTargetReady();
   } else if (what & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
-    self->Cleanup("target closed");
+    self->HandleTargetClose();
   }
 }
 
 void LocalClient::HandleClientRead(evbuffer *buf) {
+#if USE_DEBUG
   client_read_bytes_ += evbuffer_get_length(buf);
+#endif
 
   int data_len = evbuffer_get_length(buf);
   unsigned char *data = evbuffer_pullup(buf, data_len);
@@ -194,18 +196,24 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       return;
     }
 
+#if USE_DEBUG
     target_write_bytes_ += evbuffer_get_length(encoded);
+#endif
     bufferevent_write_buffer(target_, encoded);
     evbuffer_free(encoded);
   }
 }
 
 void LocalClient::HandleClientEmpty() {
-  if (step_ == STEP_TRANSPORT && client_busy_) {
+  if (step_ == STEP_FLUSHING) {
+    Cleanup("target closed");
+  } else if (step_ == STEP_TRANSPORT && client_busy_) {
     client_busy_ = false;
     bufferevent_enable(target_, EV_READ);
   }
 }
+
+void LocalClient::HandleClientClose() { Cleanup("client closed"); }
 
 void LocalClient::HandleTargetReady() {
   step_ = STEP_TRANSPORT;
@@ -219,7 +227,9 @@ void LocalClient::HandleTargetReady() {
     return;
   }
 
+#if USE_DEBUG
   target_write_bytes_ += evbuffer_get_length(encoded);
+#endif
   bufferevent_write_buffer(target_, encoded);
   evbuffer_free(encoded);
 
@@ -242,7 +252,9 @@ void LocalClient::HandleTargetReady() {
 }
 
 void LocalClient::HandleTargetRead(evbuffer *buf) {
+#if USE_DEBUG
   target_read_bytes_ += evbuffer_get_length(buf);
+#endif
 
   evbuffer *decoded = nullptr;
   int cret = crypto_->Decrypt(buf, decoded);
@@ -254,7 +266,9 @@ void LocalClient::HandleTargetRead(evbuffer *buf) {
     return;
   }
 
+#if USE_DEBUG
   client_write_bytes_ += evbuffer_get_length(decoded);
+#endif
   bufferevent_write_buffer(client_, decoded);
   evbuffer_free(decoded);
 
@@ -268,6 +282,16 @@ void LocalClient::HandleTargetEmpty() {
   if (step_ == STEP_TRANSPORT && target_busy_) {
     target_busy_ = false;
     bufferevent_enable(client_, EV_READ);
+  }
+}
+
+void LocalClient::HandleTargetClose() {
+  if (evbuffer_get_length(bufferevent_get_output(client_)) == 0) {
+    Cleanup("target closed");
+  } else {
+    step_ = STEP_FLUSHING;
+    bufferevent_setcb(client_, NULL, OnClientWrite, OnClientEvent, this);
+    bufferevent_disable(client_, EV_READ);
   }
 }
 

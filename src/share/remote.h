@@ -44,9 +44,11 @@ class RemoteClient {
 
   void HandleClientRead(evbuffer *buf);
   void HandleClientEmpty();
+  void HandleClientClose();
   void HandleTargetReady();
   void HandleTargetRead(evbuffer *buf);
   void HandleTargetEmpty();
+  void HandleTargetClose();
 
   event_base *base_;
   evdns_base *dnsbase_;
@@ -58,8 +60,10 @@ class RemoteClient {
   bool client_busy_ = false;
   bool target_busy_ = false;
 
+#if USE_DEBUG
   size_t client_read_bytes_ = 0;
   size_t client_write_bytes_ = 0;
   size_t target_read_bytes_ = 0;
   size_t target_write_bytes_ = 0;
+#endif
 };
