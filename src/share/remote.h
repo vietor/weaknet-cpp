@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client.h"
 #include "crypto.h"
 
 class RemoteServer {
@@ -24,13 +25,6 @@ class RemoteServer {
 };
 
 class RemoteClient {
-  enum RuningStep {
-    STEP_INIT = 0,
-    STEP_CONNECT,
-    STEP_TRANSPORT,
-    STEP_TERMINATE
-  };
-
  public:
   RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto,
                bufferevent *client);
@@ -63,4 +57,9 @@ class RemoteClient {
   evbuffer *target_cached_ = nullptr;
   bool client_busy_ = false;
   bool target_busy_ = false;
+
+  size_t client_read_bytes_ = 0;
+  size_t client_write_bytes_ = 0;
+  size_t target_read_bytes_ = 0;
+  size_t target_write_bytes_ = 0;
 };

@@ -73,13 +73,15 @@ void LocalClient::Startup() {
 }
 
 void LocalClient::Cleanup(const char *reason) {
-#if USE_DEBUG
-  if (strstr(reason, "error")) {
-    dump("cleanup: client: %d, target: %d, step: %d, %s\n",
-         bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0,
-         step_, reason);
-  }
-#endif
+  if (step_ == STEP_TERMINATE) return;
+
+  dump(
+      "cleanup: client: %d, target: %d, step: %d, %s\n"
+      " - I/O bytes: client: %d/%d, target: %d/%d\n",
+      bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0,
+      step_, reason, client_read_bytes_, client_write_bytes_,
+      target_read_bytes_, target_write_bytes_);
+
   step_ = STEP_TERMINATE;
   delete this;
 }
@@ -147,6 +149,8 @@ void LocalClient::OnTargetEvent(bufferevent *bev, short what, void *ctx) {
 }
 
 void LocalClient::HandleClientRead(evbuffer *buf) {
+  client_read_bytes_ += evbuffer_get_length(buf);
+
   int data_len = evbuffer_get_length(buf);
   unsigned char *data = evbuffer_pullup(buf, data_len);
 
@@ -190,6 +194,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
       return;
     }
 
+    target_write_bytes_ += evbuffer_get_length(encoded);
     bufferevent_write_buffer(target_, encoded);
     evbuffer_free(encoded);
   }
@@ -204,6 +209,8 @@ void LocalClient::HandleClientEmpty() {
 
 void LocalClient::HandleTargetReady() {
   step_ = STEP_TRANSPORT;
+  dump("ready: client: %d, target: %d\n", bufferevent_getfd(client_),
+       bufferevent_getfd(target_));
 
   evbuffer *encoded = nullptr, *buf = target_cached_;
   target_cached_ = nullptr;
@@ -212,6 +219,7 @@ void LocalClient::HandleTargetReady() {
     return;
   }
 
+  target_write_bytes_ += evbuffer_get_length(encoded);
   bufferevent_write_buffer(target_, encoded);
   evbuffer_free(encoded);
 
@@ -234,6 +242,8 @@ void LocalClient::HandleTargetReady() {
 }
 
 void LocalClient::HandleTargetRead(evbuffer *buf) {
+  target_read_bytes_ += evbuffer_get_length(buf);
+
   evbuffer *decoded = nullptr;
   int cret = crypto_->Decrypt(buf, decoded);
   if (cret == CRYPTO_NEED_NORE) {
@@ -244,6 +254,7 @@ void LocalClient::HandleTargetRead(evbuffer *buf) {
     return;
   }
 
+  client_write_bytes_ += evbuffer_get_length(decoded);
   bufferevent_write_buffer(client_, decoded);
   evbuffer_free(decoded);
 

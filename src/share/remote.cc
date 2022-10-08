@@ -62,13 +62,15 @@ void RemoteClient::Startup() {
 }
 
 void RemoteClient::Cleanup(const char *reason) {
-#if USE_DEBUG
-  if (strstr(reason, "error")) {
-    dump("cleanup: client: %d, target: %d, step: %d, %s\n",
-         bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0,
-         step_, reason);
-  }
-#endif
+  if (step_ == STEP_TERMINATE) return;
+
+  dump(
+      "cleanup: client: %d, target: %d, step: %d, %s\n"
+      " - I/O bytes: client: %d/%d, target: %d/%d\n",
+      bufferevent_getfd(client_), target_ ? bufferevent_getfd(target_) : 0,
+      step_, reason, client_read_bytes_, client_write_bytes_,
+      target_read_bytes_, target_write_bytes_);
+
   step_ = STEP_TERMINATE;
   delete this;
 }
@@ -122,6 +124,8 @@ void RemoteClient::OnTargetEvent(bufferevent *bev, short what, void *ctx) {
 }
 
 void RemoteClient::HandleClientRead(evbuffer *buf) {
+  client_read_bytes_ += evbuffer_get_length(buf);
+
   evbuffer *decoded = nullptr;
   int cret = crypto_->Decrypt(buf, decoded);
   if (cret == CRYPTO_NEED_NORE) {
@@ -221,6 +225,7 @@ void RemoteClient::HandleClientRead(evbuffer *buf) {
       evbuffer_add_buffer(target_cached_, decoded);
     }
   } else {
+    target_write_bytes_ += evbuffer_get_length(decoded);
     bufferevent_write_buffer(target_, decoded);
 
     if (bufferevent_output_busy(target_)) {
@@ -239,7 +244,11 @@ void RemoteClient::HandleClientEmpty() {
 
 void RemoteClient::HandleTargetReady() {
   step_ = STEP_TRANSPORT;
+  dump("ready: client: %d, target: %d\n", bufferevent_getfd(client_),
+       bufferevent_getfd(target_));
+
   if (target_cached_) {
+    target_write_bytes_ += evbuffer_get_length(target_cached_);
     bufferevent_write_buffer(target_, target_cached_);
     evbuffer_free(target_cached_);
     target_cached_ = nullptr;
@@ -247,6 +256,8 @@ void RemoteClient::HandleTargetReady() {
 }
 
 void RemoteClient::HandleTargetRead(evbuffer *buf) {
+  target_read_bytes_ += evbuffer_get_length(buf);
+
   evbuffer *encoded = nullptr;
   int cret = crypto_->Encrypt(buf, encoded);
   if (cret != CRYPTO_OK) {
@@ -254,6 +265,7 @@ void RemoteClient::HandleTargetRead(evbuffer *buf) {
     return;
   }
 
+  client_write_bytes_ += evbuffer_get_length(encoded);
   bufferevent_write_buffer(client_, encoded);
   evbuffer_free(encoded);
 

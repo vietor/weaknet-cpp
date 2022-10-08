@@ -1,5 +1,6 @@
 #pragma once
 
+#include "client.h"
 #include "crypto.h"
 
 class LocalServer {
@@ -25,14 +26,6 @@ class LocalServer {
 };
 
 class LocalClient {
-  enum RuningStep {
-    STEP_INIT = 0,
-    STEP_WAITHDR,
-    STEP_CONNECT,
-    STEP_TRANSPORT,
-    STEP_TERMINATE
-  };
-
   enum RuningProtocol {
     PROTOCOL_NONE = 0,
     PROTOCOL_SOCKS4,
@@ -76,10 +69,15 @@ class LocalClient {
   Crypto *crypto_;
   bufferevent *client_;
   const sockaddr_storage *remote_addr_ = nullptr;
-  RuningStep step_ = STEP_INIT;
+  mutable RuningStep step_ = STEP_INIT;
   RuningProtocol protocol_ = PROTOCOL_NONE;
   bufferevent *target_ = nullptr;
   evbuffer *target_cached_ = nullptr;
   bool client_busy_ = false;
   bool target_busy_ = false;
+
+  size_t client_read_bytes_ = 0;
+  size_t client_write_bytes_ = 0;
+  size_t target_read_bytes_ = 0;
+  size_t target_write_bytes_ = 0;
 };
