@@ -157,20 +157,20 @@ void RemoteClient::HandleClientRead(evbuffer *buf) {
         addr_len = 16;
         break;
       default:
-        Cleanup("error proxy header, type");
+        Cleanup("error: proxy header, type");
         return;
     }
 
     int drain_len = addr_pos + addr_len + 2;
     if (drain_len > data_len) {
-      Cleanup("error proxy header, addr");
+      Cleanup("error: proxy header, addr");
       return;
     }
 
     unsigned short port =
         ntohs(*(unsigned short *)(data + addr_pos + addr_len));
     if (!port) {
-      Cleanup("error proxy header, port");
+      Cleanup("error: proxy header, port");
       return;
     }
 

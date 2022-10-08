@@ -157,7 +157,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
     int version = data[0];
     if (version == 5) {
       if (data_len < 3) {
-        Cleanup("error socks5 header, size");
+        Cleanup("error: socks5 header, size");
         return;
       }
 
@@ -175,7 +175,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
                isupper(data[2])) {
       ProcessProtocolPROXY(data, data_len);
     } else {
-      Cleanup("error proxy header, block");
+      Cleanup("error: proxy header, block");
     }
   } else if (step_ == STEP_WAITHDR) {
     ProcessProtocolSOCKS5(data, data_len);
@@ -262,12 +262,12 @@ void LocalClient::HandleTargetEmpty() {
 
 void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
   if (data_len < 9 || data[data_len - 1] != 0x00) {
-    Cleanup("error socks4 header, size");
+    Cleanup("error: socks4 header, size");
     return;
   }
 
   if (data[1] != 0x01) {
-    Cleanup("error socks4 command");
+    Cleanup("error: socks4 command");
     return;
   }
 
@@ -283,20 +283,20 @@ void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
   } else {
     unsigned char *ptr = (unsigned char *)memchr(data + 7, 0, data_len - 7);
     if (!ptr) {
-      Cleanup("error socks4 userid");
+      Cleanup("error: socks4 userid");
       return;
     }
 
     int domain = (ptr - data) + 1;
     ptr = (unsigned char *)memchr(data + domain, 0, data_len - domain);
     if (!ptr) {
-      Cleanup("error socks4a domain");
+      Cleanup("error: socks4a domain");
       return;
     }
 
     int domain_len = strlen((char *)data + domain);
     if (domain_len > 255) {
-      Cleanup("error socks4a domain, size");
+      Cleanup("error: socks4a domain, size");
       return;
     }
 
@@ -312,12 +312,12 @@ void LocalClient::ProcessProtocolSOCKS4(unsigned char *data, int data_len) {
 
 void LocalClient::ProcessProtocolSOCKS5(unsigned char *data, int data_len) {
   if (data_len < 7 || data[0] != 0x05) {
-    Cleanup("error socks5 header, size");
+    Cleanup("error: socks5 header, size");
     return;
   }
 
   if (data[1] != 0x01) {
-    Cleanup("error socks5 command");
+    Cleanup("error: socks5 command");
     return;
   }
 
@@ -336,7 +336,7 @@ void LocalClient::ProcessProtocolSOCKS5(unsigned char *data, int data_len) {
       break;
   }
   if (rear < 1 || rear > data_len) {
-    Cleanup("error socks5 address");
+    Cleanup("error: socks5 address");
     return;
   }
 
@@ -352,7 +352,7 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
   unsigned char *ptr = (unsigned char *)memchr(data + address_start, ' ',
                                                data_len - address_start);
   if (!ptr || (ptr - data + 10 > data_len) || memcmp(ptr, " HTTP/1.", 8)) {
-    Cleanup("error connect header, format");
+    Cleanup("error: connect header, format");
     return;
   }
 
@@ -361,7 +361,7 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
   ptr = (unsigned char *)memchr(data + address_start, ':',
                                 ptr - data - address_start);
   if (!ptr || ptr == data || ptr[1] == ' ') {
-    Cleanup("error connect header, address");
+    Cleanup("error: connect header, address");
     return;
   }
 
@@ -370,7 +370,7 @@ void LocalClient::ProcessProtocolCONNECT(unsigned char *data, int data_len) {
   int port = atoi((char *)ptr + 1);
   int domain_len = strlen((char *)data + address_start);
   if (domain_len > 255 || port < 1 || port > 65535) {
-    Cleanup("error connect header, address");
+    Cleanup("error: connect header, address");
     return;
   }
 
@@ -425,7 +425,7 @@ void LocalClient::ProcessProtocolPROXY(unsigned char *data, int data_len) {
   }
 
   if (!http_flag) {
-    Cleanup("error proxy header, protocol");
+    Cleanup("error: proxy header, protocol");
     return;
   }
 
