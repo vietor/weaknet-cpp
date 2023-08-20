@@ -13,7 +13,7 @@ So, i need upgrade the server for my **shadowsocks** clients. I am unhappy.
 * My principle is **Simple** and **Enough**  
   I just need a server, i don't need others in the source code. I don't like split sub projects for **one** job.
   
-* The library **libevnet** is cute, so use c/c++
+* The library **libevent** is cute, so use c/c++
 
 # Build
 
