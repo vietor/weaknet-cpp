@@ -28,7 +28,7 @@ cmake -DCMAKE_BUILD_TYPE=Release .
 ## weaknet-server
 
 ```
-Usage: weaknet-server <options>
+Usage: weaknet-server [command-line-file] [options]
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
@@ -45,7 +45,7 @@ Options:
 Support *socks4* *socks4a* *socks5* *http-connect* *http-proxy* protocol.
 
 ```
-Usage: weaknet-client <options>
+Usage: weaknet-client [command-line-file] [options]
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
