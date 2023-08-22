@@ -25,7 +25,7 @@ void usage(const char *app, const char *format) {
   exit(EXIT_FAILURE);
 }
 
-void parse_cmdline_arguments(int argc, char **argv, int *p_argc,
+void parse_cmdline(int argc, char **argv, int *p_argc,
                              char ***p_argv) {
   int i;
   std::vector<char *> arguments;

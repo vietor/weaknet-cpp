@@ -28,7 +28,7 @@ cmake -DCMAKE_BUILD_TYPE=Release .
 ## weaknet-server
 
 ```
-Usage: weaknet-server [command-line-file] [options]
+Usage: weaknet-server [options-file] [options]
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
@@ -45,7 +45,7 @@ Options:
 Support *socks4* *socks4a* *socks5* *http-connect* *http-proxy* protocol.
 
 ```
-Usage: weaknet-client [command-line-file] [options]
+Usage: weaknet-client [options-file] [options]
 Options:
  -p or --port <port>, range 1-65535
  -m or --algorithm <algorithm>, support list:
@@ -56,4 +56,19 @@ Options:
  -R or --remote-addr <ip:port>
  -v or --version
  -h or --help
+```
+
+## What's options-file
+
+Just a text file, useful for hiding options from the command line.
+
+```
+./weaknet-server ./server.conf -p 12345
+```
+
+*server.conf* example:
+
+```
+-m chacha20
+-s 12345
 ```

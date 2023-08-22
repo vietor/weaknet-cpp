@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
   int parsed_argc = 0;
   char **parsed_argv = NULL;
-  parse_cmdline_arguments(argc, argv, &parsed_argc, &parsed_argv);
+  parse_cmdline(argc, argv, &parsed_argc, &parsed_argv);
 
   int port = 1080, remote_port = 51080;
   std::string algorithm, password, remote_addr;
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
 
       default:
         usage(argv[0],
-              "Usage: %s [command-line-file] [options]\n"
+              "Usage: %s [options-file] [options]\n"
               "Options:\n"
               " -p or --port <port>, range 1-65535\n"
               " -m or --algorithm <algorithm>, support list:\n"
