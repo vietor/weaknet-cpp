@@ -7,7 +7,7 @@
 
 int main(int argc, char *argv[]) {
   int opt;
-  const char *short_options = "p:m:s:R:h";
+  const char *short_options = "p:m:s:R:vh";
   struct option long_options[] = {{"port", required_argument, NULL, 'p'},
                                   {"algorithm", required_argument, NULL, 'm'},
                                   {"password", required_argument, NULL, 's'},
@@ -16,10 +16,14 @@ int main(int argc, char *argv[]) {
                                   {"help", no_argument, NULL, 'h'},
                                   {0, 0, 0, 0}};
 
+  int parsed_argc = 0;
+  char **parsed_argv = NULL;
+  parse_cmdline_arguments(argc, argv, &parsed_argc, &parsed_argv);
+
   int port = 1080, remote_port = 51080;
   std::string algorithm, password, remote_addr;
-  while ((opt = getopt_long(argc, argv, short_options, long_options, NULL)) !=
-         -1) {
+  while ((opt = getopt_long(parsed_argc, parsed_argv, short_options,
+                            long_options, NULL)) != -1) {
     switch (opt) {
       case 'p':
         port = atoi(optarg);
@@ -43,7 +47,7 @@ int main(int argc, char *argv[]) {
 
       default:
         usage(argv[0],
-              "Usage: %s <options>\n"
+              "Usage: %s [command-line-file] [options]\n"
               "Options:\n"
               " -p or --port <port>, range 1-65535\n"
               " -m or --algorithm <algorithm>, support list:\n"
@@ -58,6 +62,8 @@ int main(int argc, char *argv[]) {
         break;
     }
   }
+
+  parse_cmdline_free(&parsed_argc, &parsed_argv);
 
   if (port < 1 || port > 65535) {
     quit("invalid option: port");
