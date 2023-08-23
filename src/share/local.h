@@ -26,14 +26,6 @@ class LocalServer {
 };
 
 class LocalClient {
-  enum RuningProtocol {
-    PROTOCOL_NONE = 0,
-    PROTOCOL_SOCKS4,
-    PROTOCOL_SOCKS5,
-    PROTOCOL_CONNECT,
-    PROTOCOL_PROXY
-  };
-
  public:
   LocalClient(event_base *base, evdns_base *dnsbase, Crypto *crypto,
               bufferevent *client, const sockaddr_storage *remote_addr);

@@ -181,7 +181,7 @@ void LocalClient::HandleClientRead(evbuffer *buf) {
                isupper(data[2])) {
       ProcessProtocolPROXY(data, data_len);
     } else {
-      Cleanup("error: proxy header, block");
+      Cleanup("error: protocol block");
     }
   } else if (step_ == STEP_WAITHDR) {
     ProcessProtocolSOCKS5(data, data_len);

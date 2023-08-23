@@ -8,3 +8,11 @@ enum RuningStep {
   STEP_FLUSHING,
   STEP_TERMINATE
 };
+
+enum RuningProtocol {
+  PROTOCOL_NONE = 0,
+  PROTOCOL_SOCKS4 = 1 << 1,
+  PROTOCOL_SOCKS5 = 1 << 2,
+  PROTOCOL_CONNECT = 1 << 3,
+  PROTOCOL_PROXY = 1 << 4
+};
