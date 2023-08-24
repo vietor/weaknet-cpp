@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <cstring>
 
-#include "version.h"
-#include "../share/remote.h"
+#include "remote.h"
+#include "../version.h"
 
 int main(int argc, char *argv[]) {
   int opt;

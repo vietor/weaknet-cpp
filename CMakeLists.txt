@@ -32,8 +32,10 @@ endif()
 
 aux_source_directory(src/share SHARE_SOURCES)
 
-add_executable(weaknet-server src/cmds/server.cc ${SHARE_SOURCES})
+aux_source_directory(src/client SERVER_SOURCES)
+add_executable(weaknet-server ${SERVER_SOURCES} ${SHARE_SOURCES})
 target_link_libraries(weaknet-server ${EXTERNAL_LIBRARIES})
 
-add_executable(weaknet-client src/cmds/client.cc ${SHARE_SOURCES})
+aux_source_directory(src/client CLIENT_SOURCES)
+add_executable(weaknet-client ${CLIENT_SOURCES} ${SHARE_SOURCES})
 target_link_libraries(weaknet-client ${EXTERNAL_LIBRARIES})

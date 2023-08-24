@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "version.h"
-#include "../share/local.h"
+#include "local.h"
+#include "../version.h"
 
 int main(int argc, char *argv[]) {
   int opt;

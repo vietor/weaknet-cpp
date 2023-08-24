@@ -1,13 +1,13 @@
 #pragma once
 
-#include "client.h"
-#include "crypto.h"
+#include "../share/crypto.h"
+#include "../share/protocol.h"
 
-class RemoteServer {
+class LocalServer {
  public:
-  RemoteServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator,
-               unsigned short port);
-  ~RemoteServer();
+  LocalServer(event_base *base, evdns_base *dnsbase, CryptoCreator *creator,
+              unsigned short port, const sockaddr_storage *remote_addr);
+  ~LocalServer();
 
   bool Startup(std::string &error);
 
@@ -22,18 +22,21 @@ class RemoteServer {
   CryptoCreator *creator_;
   unsigned short port_;
   evconnlistener *listener_ = nullptr;
+  const sockaddr_storage *remote_addr_ = nullptr;
 };
 
-class RemoteClient {
+class LocalClient {
  public:
-  RemoteClient(event_base *base, evdns_base *dnsbase, Crypto *crypto,
-               bufferevent *client);
+  LocalClient(event_base *base, evdns_base *dnsbase, Crypto *crypto,
+              bufferevent *client, const sockaddr_storage *remote_addr);
 
   void Startup();
 
  private:
-  ~RemoteClient();
+  ~LocalClient();
   void Cleanup(const char *reason);
+
+  void ConnectTarget();
 
   static void OnClientRead(bufferevent *bev, void *ctx);
   static void OnClientWrite(bufferevent *bev, void *ctx);
@@ -50,11 +53,18 @@ class RemoteClient {
   void HandleTargetEmpty();
   void HandleTargetClose();
 
+  void ProcessProtocolSOCKS4(unsigned char *data, int data_len);
+  void ProcessProtocolSOCKS5(unsigned char *data, int data_len);
+  void ProcessProtocolCONNECT(unsigned char *data, int data_len);
+  void ProcessProtocolPROXY(unsigned char *data, int data_len);
+
   event_base *base_;
   evdns_base *dnsbase_;
   Crypto *crypto_;
   bufferevent *client_;
-  RuningStep step_ = STEP_INIT;
+  const sockaddr_storage *remote_addr_ = nullptr;
+  mutable RuningStep step_ = STEP_INIT;
+  RuningProtocol protocol_ = PROTOCOL_NONE;
   bufferevent *target_ = nullptr;
   evbuffer *target_cached_ = nullptr;
   bool client_busy_ = false;
