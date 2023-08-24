@@ -32,7 +32,7 @@ endif()
 
 aux_source_directory(src/share SHARE_SOURCES)
 
-aux_source_directory(src/client SERVER_SOURCES)
+aux_source_directory(src/server SERVER_SOURCES)
 add_executable(weaknet-server ${SERVER_SOURCES} ${SHARE_SOURCES})
 target_link_libraries(weaknet-server ${EXTERNAL_LIBRARIES})
 
